@@ -1,0 +1,53 @@
+
+BlenderXR\blender\source\blender\windowmanager\intern\wm_draw.c
+597:
+#if WITH_VR
+			if (win && win == vr_get_obj()->window && wm_region_use_viewport(sa, ar)) {
+				CTX_wm_region_set(C, ar);
+				vr_create_viewports(ar);
+
+				/* Update tracking. */
+				vr_update_tracking();
+
+				/* Perform interactions. */
+				vr_do_interaction();
+
+				/* Draw to VR offscreen buffers. */
+				vr_update_viewport_bounds(&ar->winrct);
+#if VR_PANCAKE
+				for (int view = 1; view < 2; ++view) {
+#else
+				for (int view = 0; view < 2; ++view) {
+#endif
+					wm_draw_region_stereo_set(bmain, sa, ar, view);
+					vr_draw_region_bind(ar, view);
+					ED_region_do_draw(C, ar);
+					vr_draw_region_unbind(ar, view);
+				}
+
+				/* Perform post-render interactions. */
+				vr_do_post_render_interaction();
+
+				ar->do_draw = false;
+				CTX_wm_region_set(C, NULL);
+				continue;
+			}
+#endif
+
+------------------------------------------------------------------------------
+BlenderXR\blender\source\blender\vr\intern\vr_ui.cpp
+894:
+VR_UI::Error VR_UI::update_tracking()
+
+------------------------------------------------------------------------------
+BlenderXR\blender\source\blender\vr\intern\vr_main.c
+566:
+int vr_update_tracking(void)
+
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
