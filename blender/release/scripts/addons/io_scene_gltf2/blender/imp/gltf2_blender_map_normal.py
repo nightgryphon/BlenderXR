@@ -1,4 +1,4 @@
-# Copyright 2018 The glTF-Blender-IO authors.
+# Copyright 2018-2019 The glTF-Blender-IO authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 import bpy
 from .gltf2_blender_texture import BlenderTextureInfo
+from ..com.gltf2_blender_conversion import texture_transform_gltf_to_blender
 
 
 class BlenderNormalMap():
@@ -35,7 +36,7 @@ class BlenderNormalMap():
         material = bpy.data.materials[pymaterial.blender_material[vertex_color]]
         node_tree = material.node_tree
 
-        BlenderTextureInfo.create(gltf, pymaterial.normal_texture.index)
+        BlenderTextureInfo.create(gltf, pymaterial.normal_texture)
 
         # retrieve principled node and output node
         principled = None
@@ -66,8 +67,17 @@ class BlenderNormalMap():
                 gltf.data.textures[pymaterial.normal_texture.index].source
             ].blender_image_name]
         text.label = 'NORMALMAP'
-        text.color_space = 'NONE'
+        if text.image:
+            text.image.colorspace_settings.is_data = True
         text.location = -500, -500
+        if text.image is not None: # Sometimes images can't be retrieved (bad gltf file ...)
+            tex_transform = text.image['tex_transform'][str(pymaterial.normal_texture.index)]
+            mapping.inputs['Location'].default_value[0] = texture_transform_gltf_to_blender(tex_transform)['offset'][0]
+            mapping.inputs['Location'].default_value[1] = texture_transform_gltf_to_blender(tex_transform)['offset'][1]
+            mapping.inputs['Rotation'].default_value[2] = texture_transform_gltf_to_blender(tex_transform)['rotation']
+            mapping.inputs['Scale'].default_value[0] = texture_transform_gltf_to_blender(tex_transform)['scale'][0]
+            mapping.inputs['Scale'].default_value[1] = texture_transform_gltf_to_blender(tex_transform)['scale'][1]
+
 
         normalmap_node = node_tree.nodes.new('ShaderNodeNormalMap')
         normalmap_node.location = -250, -500
@@ -88,9 +98,9 @@ class BlenderNormalMap():
         node_tree.links.new(text.inputs[0], mapping.outputs[0])
         node_tree.links.new(normalmap_node.inputs[1], text.outputs[0])
 
-        # following  links will modify PBR node tree
+        # following links will modify PBR node tree
         if principled:
-            node_tree.links.new(principled.inputs[17], normalmap_node.outputs[0])
+            node_tree.links.new(principled.inputs[19], normalmap_node.outputs[0])
         if diffuse:
             node_tree.links.new(diffuse.inputs[2], normalmap_node.outputs[0])
         if glossy:

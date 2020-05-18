@@ -25,7 +25,7 @@
 bl_info = {
     "name": "Extra Objects",
     "author": "Multiple Authors",
-    "version": (0, 3, 3),
+    "version": (0, 3, 4),
     "blender": (2, 80, 0),
     "location": "View3D > Add > Mesh",
     "description": "Add extra mesh object types",
@@ -57,7 +57,6 @@ if "bpy" in locals():
     importlib.reload(add_mesh_menger_sponge)
     importlib.reload(add_mesh_vertex)
     importlib.reload(add_empty_as_parent)
-    importlib.reload(mesh_discombobulator)
     importlib.reload(add_mesh_beam_builder)
     importlib.reload(Blocks)
     importlib.reload(Wallfactory)
@@ -80,7 +79,6 @@ else:
     from . import add_mesh_menger_sponge
     from . import add_mesh_vertex
     from . import add_empty_as_parent
-    from . import mesh_discombobulator
     from . import add_mesh_beam_builder
     from . import Blocks
     from . import Wallfactory
@@ -151,21 +149,7 @@ class VIEW3D_MT_mesh_math_add(Menu):
         layout.operator("mesh.primitive_xyz_function_surface",
                         text="XYZ Math Surface")
         self.layout.operator("mesh.primitive_solid_add", text="Regular Solid")
-        self.layout.operator("mesh.make_triangle", icon="MESH_DATA")
-
-
-class VIEW3D_MT_mesh_mech(Menu):
-    # Define the "Math Function" menu
-    bl_idname = "VIEW3D_MT_mesh_mech_add"
-    bl_label = "Mechanical"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.menu("VIEW3D_MT_mesh_pipe_joints_add",
-                text="Pipe Joints")
-        layout.menu("VIEW3D_MT_mesh_gears_add",
-                text="Gears")
+        self.layout.operator("mesh.make_triangle")
 
 
 class VIEW3D_MT_mesh_extras_add(Menu):
@@ -176,9 +160,6 @@ class VIEW3D_MT_mesh_extras_add(Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.menu("VIEW3D_MT_mesh_diamonds_add", text="Diamonds",
-                    icon="PMARKER_SEL")
-        layout.separator()
         layout.operator("mesh.add_beam",
                         text="Beam Builder")
         layout.operator("mesh.wall_add",
@@ -235,29 +216,120 @@ class VIEW3D_MT_mesh_pipe_joints_add(Menu):
 
 # Define "Extras" menu
 def menu_func(self, context):
-    lay_out = self.layout
-    lay_out.operator_context = 'INVOKE_REGION_WIN'
+    layout = self.layout
+    layout.operator_context = 'INVOKE_REGION_WIN'
 
-    lay_out.separator()
-    lay_out.menu("VIEW3D_MT_mesh_vert_add",
-                text="Single Vert")
-    lay_out.operator("mesh.primitive_round_cube_add",
-                    text="Round Cube")
-    lay_out.menu("VIEW3D_MT_mesh_math_add",
+    layout.separator()
+    layout.menu("VIEW3D_MT_mesh_vert_add",
+                text="Single Vert", icon="DECORATE")
+    layout.operator("mesh.primitive_round_cube_add",
+                    text="Round Cube", icon="SPHERE")
+    layout.menu("VIEW3D_MT_mesh_torus_add",
+                text="Torus Objects", icon="MESH_TORUS")
+    layout.separator()
+    layout.menu("VIEW3D_MT_mesh_math_add",
                 text="Math Function", icon="PACKAGE")
-    lay_out.menu("VIEW3D_MT_mesh_mech_add",
-                text="Mechanical")
-    lay_out.menu("VIEW3D_MT_mesh_torus_add",
-                text="Torus Objects")
-    lay_out.separator()
-    lay_out.operator("discombobulate.ops",
-                    text="Discombobulator")
-    lay_out.separator()
-    lay_out.menu("VIEW3D_MT_mesh_extras_add",
+    layout.menu("VIEW3D_MT_mesh_gears_add",
+                text="Gears", icon="PREFERENCES")
+    layout.menu("VIEW3D_MT_mesh_pipe_joints_add",
+                text="Pipe Joints", icon="EMPTY_DATA")
+    layout.separator()
+    layout.menu("VIEW3D_MT_mesh_diamonds_add", text="Diamonds")
+    layout.menu("VIEW3D_MT_mesh_extras_add",
                 text="Extras")
-    lay_out.separator()
-    lay_out.operator("object.parent_to_empty",
+    layout.separator()
+    layout.operator("object.parent_to_empty",
                     text="Parent To Empty")
+
+def Extras_contex_menu(self, context):
+    bl_label = 'Change'
+    
+    obj = context.object
+    layout = self.layout
+    
+    if 'Gear' in obj.data.keys():
+        props = layout.operator("mesh.primitive_gear", text="Change Gear")
+        props.change = True
+        for prm in add_mesh_gears.GearParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'WormGear' in obj.data.keys():
+        props = layout.operator("mesh.primitive_worm_gear", text="Change WormGear")
+        props.change = True
+        for prm in add_mesh_gears.WormGearParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+        
+    if 'Beam' in obj.data.keys():
+        props = layout.operator("mesh.add_beam", text="Change Beam")
+        props.change = True
+        for prm in add_mesh_beam_builder.BeamParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'Wall' in obj.data.keys():
+        props = layout.operator("mesh.wall_add", text="Change Wall")
+        props.change = True
+        for prm in Wallfactory.WallParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'ElbowJoint' in obj.data.keys():
+        props = layout.operator("mesh.primitive_elbow_joint_add", text="Change ElbowJoint")
+        props.change = True
+        for prm in add_mesh_pipe_joint.ElbowJointParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'TeeJoint' in obj.data.keys():
+        props = layout.operator("mesh.primitive_tee_joint_add", text="Change TeeJoint")
+        props.change = True
+        for prm in add_mesh_pipe_joint.TeeJointParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'WyeJoint' in obj.data.keys():
+        props = layout.operator("mesh.primitive_wye_joint_add", text="Change WyeJoint")
+        props.change = True
+        for prm in add_mesh_pipe_joint.WyeJointParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'CrossJoint' in obj.data.keys():
+        props = layout.operator("mesh.primitive_cross_joint_add", text="Change CrossJoint")
+        props.change = True
+        for prm in add_mesh_pipe_joint.CrossJointParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'NJoint' in obj.data.keys():
+        props = layout.operator("mesh.primitive_n_joint_add", text="Change NJoint")
+        props.change = True
+        for prm in add_mesh_pipe_joint.NJointParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+
+    if 'Diamond' in obj.data.keys():
+        props = layout.operator("mesh.primitive_diamond_add", text="Change Diamond")
+        props.change = True
+        for prm in add_mesh_gemstones.DiamondParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+        
+    if 'Gem' in obj.data.keys():
+        props = layout.operator("mesh.primitive_gem_add", text="Change Gem")
+        props.change = True
+        for prm in add_mesh_gemstones.GemParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
+        
+    if 'Brilliant' in obj.data.keys():
+        props = layout.operator("mesh.primitive_brilliant_add", text="Change Brilliant")
+        props.change = True
+        for prm in add_mesh_round_brilliant.BrilliantParameters():
+            setattr(props, prm, obj.data[prm])
+        layout.separator()
 
 # Register
 classes = [
@@ -265,7 +337,6 @@ classes = [
     VIEW3D_MT_mesh_gears_add,
     VIEW3D_MT_mesh_diamonds_add,
     VIEW3D_MT_mesh_math_add,
-    VIEW3D_MT_mesh_mech,
     VIEW3D_MT_mesh_extras_add,
     VIEW3D_MT_mesh_torus_add,
     VIEW3D_MT_mesh_pipe_joints_add,
@@ -297,15 +368,9 @@ classes = [
     add_mesh_vertex.AddSymmetricalVert,
     add_empty_as_parent.P2E,
     add_empty_as_parent.PreFix,
-    mesh_discombobulator.discombobulator,
-    mesh_discombobulator.discombobulator_dodads_list,
-    mesh_discombobulator.discombob_help,
-    mesh_discombobulator.VIEW3D_OT_tools_discombobulate,
-    mesh_discombobulator.chooseDoodad,
-    mesh_discombobulator.unchooseDoodad,
     add_mesh_beam_builder.addBeam,
     Wallfactory.add_mesh_wallb,
-    add_mesh_triangles.MakeTriangle
+    add_mesh_triangles.MakeTriangle,
 ]
 
 def register():
@@ -313,12 +378,14 @@ def register():
     for cls in classes:
         register_class(cls)
 
-    # Add "Extras" menu to the "Add Mesh" menu
+    # Add "Extras" menu to the "Add Mesh" menu and context menu.
     bpy.types.VIEW3D_MT_mesh_add.append(menu_func)
+    bpy.types.VIEW3D_MT_object_context_menu.prepend(Extras_contex_menu)
 
 
 def unregister():
-    # Remove "Extras" menu from the "Add Mesh" menu.
+    # Remove "Extras" menu from the "Add Mesh" menu and context menu.
+    bpy.types.VIEW3D_MT_object_context_menu.remove(Extras_contex_menu)
     bpy.types.VIEW3D_MT_mesh_add.remove(menu_func)
     
     from bpy.utils import unregister_class

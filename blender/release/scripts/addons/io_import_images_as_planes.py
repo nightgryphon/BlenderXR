@@ -21,7 +21,7 @@
 bl_info = {
     "name": "Import Images as Planes",
     "author": "Florian Meyer (tstscr), mont29, matali, Ted Schundler (SpkyElctrc)",
-    "version": (3, 2, 2),
+    "version": (3, 3, 1),
     "blender": (2, 80, 0),
     "location": "File > Import > Images as Planes or Add > Mesh > Images as Planes",
     "description": "Imports images and creates planes with the appropriate aspect ratio. "
@@ -598,7 +598,7 @@ def setup_compositing(context, plane, img_spec):
             axis_fcurve.is_valid = True
             driver.expression = "%s" % driver.expression
 
-    scene.update()
+    context.view_layer.update()
 
 
 # -----------------------------------------------------------------------------
@@ -727,11 +727,11 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
     # ------------------------------
     # Properties - Material / Shader
     SHADERS = (
-        ('DIFFUSE', "Diffuse", "Diffuse Shader"),
+        ('PRINCIPLED',"Principled","Principled Shader"),
         ('SHADELESS', "Shadeless", "Only visible to camera and reflections"),
         ('EMISSION', "Emit", "Emission Shader"),
     )
-    shader: EnumProperty(name="Shader", items=SHADERS, default='DIFFUSE', description="Node shader to use")
+    shader: EnumProperty(name="Shader", items=SHADERS, default='PRINCIPLED', description="Node shader to use")
 
     emit_strength: FloatProperty(
         name="Strength", min=0.0, default=1.0, soft_max=10.0,
@@ -853,7 +853,7 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
     def invoke(self, context, event):
         engine = context.scene.render.engine
         if engine not in {'CYCLES', 'BLENDER_EEVEE'}:
-            if engine not in {'BLENDER_WORKBENCH'}:
+            if engine != 'BLENDER_WORKBENCH':
                 self.report({'ERROR'}, "Cannot generate materials for unknown %s render engine" % engine)
                 return {'CANCELLED'}
             else:
@@ -871,7 +871,7 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
         # this won't work in edit mode
         editmode = context.preferences.edit.use_enter_edit_mode
         context.preferences.edit.use_enter_edit_mode = False
-        if context.active_object and context.active_object.mode == 'EDIT':
+        if context.active_object and context.active_object.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
 
         self.import_images(context)
@@ -893,7 +893,7 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
         # Create individual planes
         planes = [self.single_image_spec_to_plane(context, img_spec) for img_spec in images]
 
-        context.scene.update()
+        context.view_layer.update()
 
         # Align planes relative to each other
         if self.offset:
@@ -938,8 +938,10 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
         return plane
 
     def apply_image_options(self, image):
-        image.use_alpha = self.use_transparency
-        image.alpha_mode = self.alpha_mode
+        if self.use_transparency == False:
+            image.alpha_mode = 'NONE'
+        else:
+            image.alpha_mode = self.alpha_mode
 
         if self.relative:
             try:  # can't always find the relative path (between drive letters on windows)
@@ -1002,13 +1004,15 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
             material = bpy.data.materials.new(name=name_compat)
 
         material.use_nodes = True
+        if self.use_transparency:
+            material.blend_method = 'BLEND'
         node_tree = material.node_tree
         out_node = clean_node_tree(node_tree)
 
         tex_image = self.create_cycles_texnode(context, node_tree, img_spec)
 
-        if self.shader == 'DIFFUSE':
-            core_shader = node_tree.nodes.new('ShaderNodeBsdfDiffuse')
+        if self.shader == 'PRINCIPLED':
+            core_shader = node_tree.nodes.new('ShaderNodeBsdfPrincipled')
         elif self.shader == 'SHADELESS':
             core_shader = get_shadeless_node(node_tree)
         else:  # Emission Shading
@@ -1019,13 +1023,16 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
         node_tree.links.new(core_shader.inputs[0], tex_image.outputs[0])
 
         if self.use_transparency:
-            bsdf_transparent = node_tree.nodes.new('ShaderNodeBsdfTransparent')
+            if self.shader == 'PRINCIPLED':
+                node_tree.links.new(core_shader.inputs[18], tex_image.outputs[1])
+            else:
+                bsdf_transparent = node_tree.nodes.new('ShaderNodeBsdfTransparent')
 
-            mix_shader = node_tree.nodes.new('ShaderNodeMixShader')
-            node_tree.links.new(mix_shader.inputs[0], tex_image.outputs[1])
-            node_tree.links.new(mix_shader.inputs[1], bsdf_transparent.outputs[0])
-            node_tree.links.new(mix_shader.inputs[2], core_shader.outputs[0])
-            core_shader = mix_shader
+                mix_shader = node_tree.nodes.new('ShaderNodeMixShader')
+                node_tree.links.new(mix_shader.inputs[0], tex_image.outputs[1])
+                node_tree.links.new(mix_shader.inputs[1], bsdf_transparent.outputs[0])
+                node_tree.links.new(mix_shader.inputs[2], core_shader.outputs[0])
+                core_shader = mix_shader
 
         node_tree.links.new(out_node.inputs[0], core_shader.outputs[0])
 
@@ -1072,7 +1079,7 @@ class IMPORT_IMAGE_OT_to_plane(Operator, AddObjectHelper):
 
         elif self.size_mode == 'CAMERA':
             x, y = compute_camera_size(
-                context, context.scene.cursor_location,
+                context, context.scene.cursor.location,
                 self.fill_mode, px / py
             )
 

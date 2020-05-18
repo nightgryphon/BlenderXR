@@ -17,13 +17,13 @@
 #ifndef __BMESH_OPERATORS_PRIVATE_H__
 #define __BMESH_OPERATORS_PRIVATE_H__
 
-/** \file \ingroup bmesh
+/** \file
+ * \ingroup bmesh
  */
 
 struct BMOperator;
 struct BMesh;
 
-void bmo_automerge_exec(BMesh *bm, BMOperator *op);
 void bmo_average_vert_facedata_exec(BMesh *bm, BMOperator *op);
 void bmo_beautify_fill_exec(BMesh *bm, BMOperator *op);
 void bmo_bevel_exec(BMesh *bm, BMOperator *op);

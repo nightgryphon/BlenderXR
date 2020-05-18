@@ -28,8 +28,8 @@
 bl_info = {
     "name": "Archimesh",
     "author": "Antonio Vazquez (antonioya)",
-    "location": "View3D > Add > Mesh > Archimesh",
-    "version": (1, 2, 0),
+    "location": "View3D > Add Mesh / Sidebar > Create Tab",
+    "version": (1, 2, 2),
     "blender": (2, 80, 0),
     "description": "Generate rooms, doors, windows, and other architecture objects",
     "wiki_url": "https://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts/Add_Mesh/Archimesh",
@@ -143,6 +143,8 @@ class ARCHIMESH_MT_CustomMenuAdd(Menu):
 # Define menu
 # noinspection PyUnusedLocal
 def AchmMenu_func(self, context):
+    layout = self.layout
+    layout.separator()
     self.layout.menu("VIEW3D_MT_mesh_custom_menu_add", icon="GROUP")
 
 

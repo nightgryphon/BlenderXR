@@ -4,7 +4,7 @@ from   ...utils       import copy_bone, flip_bone
 from   ...utils       import org, strip_org, make_deformer_name, connected_children_names, make_mechanism_name
 from   ...utils       import create_circle_widget, create_sphere_widget, create_widget, create_cube_widget
 from   ...utils       import MetarigError
-from   rna_prop_ui    import rna_idprop_ui_prop_get
+from   ...utils.mechanism import make_property
 from   ..widgets import create_face_widget, create_eye_widget, create_eyes_widget, create_ear_widget, create_jaw_widget, create_teeth_widget
 
 
@@ -44,7 +44,7 @@ class Rig:
             grand_children += connected_children_names( self.obj, child )
 
         self.org_bones   = [bone_name] + children + grand_children
-        self.face_length = obj.data.edit_bones[ self.org_bones[0] ].length
+        self.face_length = obj.data.bones[ self.org_bones[0] ].length
         self.params      = params
 
         if params.primary_layers_extra:
@@ -716,7 +716,7 @@ class Rig:
             const = owner_pb.constraints.new( 'COPY_ROTATION' )
             const.target       = self.obj
             const.subtarget    = subtarget
-            const.use_offset   = True
+            const.mix_mode     = 'OFFSET'
             const.target_space = 'LOCAL'
             const.owner_space  = 'LOCAL'
 
@@ -936,16 +936,11 @@ class Rig:
 
         for bone, prop_name in zip( [ jaw_ctrl, eyes_ctrl ], [ jaw_prop, eyes_prop ] ):
             if bone == jaw_ctrl:
-                pb[ bone ][ prop_name ] = 0.0
+                defval = 0.0
             else:
-                pb[ bone ][ prop_name ] = 1.0
+                defval = 1.0
 
-            prop = rna_idprop_ui_prop_get( pb[ bone ], prop_name )
-            prop["min"]         = 0.0
-            prop["max"]         = 1.0
-            prop["soft_min"]    = 0.0
-            prop["soft_max"]    = 1.0
-            prop["description"] = prop_name
+            make_property(pb[ bone ], prop_name, defval)
 
         # Jaw drivers
         mch_jaws = all_bones['mch']['jaw'][1:-1]
@@ -1042,7 +1037,7 @@ def add_parameters(params):
         )
     params.primary_layers = bpy.props.BoolVectorProperty(
         size=32,
-        description="Layers for the 1st tweak controls to be on",
+        description="Layers for the primary controls to be on",
         default=tuple([i == 1 for i in range(0, 32)])
         )
     params.secondary_layers_extra = bpy.props.BoolProperty(
@@ -1052,7 +1047,7 @@ def add_parameters(params):
         )
     params.secondary_layers = bpy.props.BoolVectorProperty(
         size=32,
-        description="Layers for the 2nd tweak controls to be on",
+        description="Layers for the secondary controls to be on",
         default=tuple([i == 1 for i in range(0, 32)])
         )
 

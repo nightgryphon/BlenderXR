@@ -17,7 +17,8 @@
  * All rights reserved.
  */
 
-/** \file \ingroup editors
+/** \file
+ * \ingroup editors
  */
 
 #ifndef __ED_UTIL_H__
@@ -33,17 +34,28 @@ struct wmOperatorType;
 void ED_editors_init_for_undo(struct Main *bmain);
 void ED_editors_init(struct bContext *C);
 void ED_editors_exit(struct Main *bmain, bool do_undo_system);
+
+bool ED_editors_flush_edits_ex(struct Main *bmain, bool for_render, bool check_needs_flush);
 bool ED_editors_flush_edits(struct Main *bmain, bool for_render);
 
-void ED_spacedata_id_remap(struct ScrArea *sa, struct SpaceLink *sl, struct ID *old_id, struct ID *new_id);
+void ED_spacedata_id_remap(struct ScrArea *sa,
+                           struct SpaceLink *sl,
+                           struct ID *old_id,
+                           struct ID *new_id);
 
 void ED_OT_flush_edits(struct wmOperatorType *ot);
 
 /* ************** XXX OLD CRUFT WARNING ************* */
 
-void apply_keyb_grid(int shift, int ctrl, float *val, float fac1, float fac2, float fac3, int invert);
+void apply_keyb_grid(
+    int shift, int ctrl, float *val, float fac1, float fac2, float fac3, int invert);
 
 /* where else to go ? */
-void unpack_menu(struct bContext *C, const char *opname, const char *id_name, const char *abs_name, const char *folder, struct PackedFile *pf);
+void unpack_menu(struct bContext *C,
+                 const char *opname,
+                 const char *id_name,
+                 const char *abs_name,
+                 const char *folder,
+                 struct PackedFile *pf);
 
 #endif /* __ED_UTIL_H__ */

@@ -1,4 +1,5 @@
-/** \file \ingroup elbeem
+/** \file
+ * \ingroup elbeem
  */
 /******************************************************************************
  *
@@ -124,9 +125,9 @@ class IsoSurface :
 
 		//! cutoff border area
 		int mCutoff;
-		//! cutoff heigh values
+		//! cutoff height values
 		int *mCutArray;
-		//! particle pointer 
+		//! particle pointer
 		ParticleTracer *mpIsoParts;
 		//! particle size
 		float mPartSize;

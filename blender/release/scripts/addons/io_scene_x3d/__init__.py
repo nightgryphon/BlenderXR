@@ -21,13 +21,12 @@
 bl_info = {
     "name": "Web3D X3D/VRML2 format",
     "author": "Campbell Barton, Bart, Bastien Montagne, Seva Alekseyev",
-    "version": (1, 2, 0),
-    "blender": (2, 76, 0),
+    "version": (2, 2, 5),
+    "blender": (2, 81, 6),
     "location": "File > Import-Export",
     "description": "Import-Export X3D, Import VRML2",
     "warning": "",
-    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts/Import-Export/Web3D",
-    "support": 'OFFICIAL',
+    "wiki_url": "https://docs.blender.org/manual/en/latest/addons/io_scene_x3d.html",
     "category": "Import-Export",
 }
 
@@ -77,6 +76,89 @@ class ImportX3D(bpy.types.Operator, ImportHelper):
         keywords["global_matrix"] = global_matrix
 
         return import_x3d.load(context, **keywords)
+
+    def draw(self, context):
+        pass
+
+
+class X3D_PT_export_include(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "include"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "EXPORT_SCENE_OT_x3d"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "use_selection")
+        layout.prop(operator, "use_hierarchy")
+        layout.prop(operator, "name_decorations")
+        layout.prop(operator, "use_h3d")
+
+
+class X3D_PT_export_transform(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Transform"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "EXPORT_SCENE_OT_x3d"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "global_scale")
+        layout.prop(operator, "axis_forward")
+        layout.prop(operator, "axis_up")
+
+
+class X3D_PT_export_geometry(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Geometry"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "EXPORT_SCENE_OT_x3d"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "use_mesh_modifiers")
+        layout.prop(operator, "use_triangulate")
+        layout.prop(operator, "use_normals")
+        layout.prop(operator, "use_compress")
 
 
 @orientation_helper(axis_forward='Z', axis_up='Y')
@@ -137,7 +219,7 @@ class ExportX3D(bpy.types.Operator, ExportHelper):
             default=1.0,
             )
 
-    path_mode = path_reference_mode
+    path_mode: path_reference_mode
 
     def execute(self, context):
         from . import export_x3d
@@ -152,10 +234,38 @@ class ExportX3D(bpy.types.Operator, ExportHelper):
                                             ))
         global_matrix = axis_conversion(to_forward=self.axis_forward,
                                         to_up=self.axis_up,
-                                        ).to_4x4() * Matrix.Scale(self.global_scale, 4)
+                                        ).to_4x4() @ Matrix.Scale(self.global_scale, 4)
         keywords["global_matrix"] = global_matrix
 
         return export_x3d.save(context, **keywords)
+
+    def draw(self, context):
+        pass
+
+
+class X3D_PT_import_transform(bpy.types.Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Transform"
+    bl_parent_id = "FILE_PT_operator"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        return operator.bl_idname == "IMPORT_SCENE_OT_x3d"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+
+        sfile = context.space_data
+        operator = sfile.active_operator
+
+        layout.prop(operator, "axis_forward")
+        layout.prop(operator, "axis_up")
 
 
 def menu_func_import(self, context):
@@ -168,21 +278,31 @@ def menu_func_export(self, context):
                          text="X3D Extensible 3D (.x3d)")
 
 
+classes = (
+    ExportX3D,
+    X3D_PT_export_include,
+    X3D_PT_export_transform,
+    X3D_PT_export_geometry,
+    ImportX3D,
+    X3D_PT_import_transform,
+)
+
+
 def register():
-    bpy.utils.register_module(__name__)
+    for cls in classes:
+        bpy.utils.register_class(cls)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
-
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
-# NOTES
-# - blender version is hardcoded
+    for cls in classes:
+        bpy.utils.unregister_class(cls)
+
 
 if __name__ == "__main__":
     register()

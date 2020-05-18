@@ -17,48 +17,25 @@
  * All rights reserved.
  */
 
-/** \file \ingroup DNA
+/** \file
+ * \ingroup DNA
  */
 
 #ifndef __DNA_GPU_TYPES_H__
 #define __DNA_GPU_TYPES_H__
 
+/* Keep for 'Camera' versioning. */
 /** Properties for dof effect. */
 typedef struct GPUDOFSettings {
-	/** Focal distance for depth of field. */
-	float focus_distance;
-	float fstop;
-	float focal_length;
-	float sensor;
-	float rotation;
-	float ratio;
-	int num_blades;
-	int high_quality;
+  /** Focal distance for depth of field. */
+  float focus_distance;
+  float fstop;
+  float focal_length;
+  float sensor;
+  float rotation;
+  float ratio;
+  int num_blades;
+  int high_quality;
 } GPUDOFSettings;
 
-/** Properties for SSAO effect. */
-typedef struct GPUSSAOSettings {
-	float factor;
-	float color[3];
-	float distance_max;
-	float attenuation;
-	/** Ray samples, we use presets here for easy control instead of. */
-	int samples;
-	int pad;
-} GPUSSAOSettings;
-
-typedef struct GPUFXSettings {
-	GPUDOFSettings *dof;
-	GPUSSAOSettings *ssao;
-	/** #eGPUFXFlags. */
-	char fx_flag;
-	char pad[7];
-} GPUFXSettings;
-
-/* shaderfx enables */
-typedef enum eGPUFXFlags {
-	GPU_FX_FLAG_DOF         = (1 << 0),
-	GPU_FX_FLAG_SSAO        = (1 << 1),
-} eGPUFXFlags;
-
-#endif  /* __DNA_GPU_TYPES_H__ */
+#endif /* __DNA_GPU_TYPES_H__ */

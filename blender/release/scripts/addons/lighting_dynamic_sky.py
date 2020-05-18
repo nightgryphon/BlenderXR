@@ -23,8 +23,8 @@ bl_info = {
     "name": "Dynamic Sky",
     "author": "Pratik Solanki",
     "version": (1, 0, 6),
-    "blender": (2, 78, 0),
-    "location": "View3D > Tools",
+    "blender": (2, 80, 0),
+    "location": "View3D > Sidebar > Create Tab",
     "description": "Creates Dynamic Sky for Cycles",
     "warning": "",
     "wiki_url": "http://www.dragoneex.com/downloads/dynamic-skyadd-on",
@@ -231,21 +231,21 @@ class dsky(Operator):
             ntl(bg.inputs[0], combine.outputs[0])
 
             map2 = nt.nodes.new(type="ShaderNodeMapping")
-            map2.scale[2] = 6.00
-            map2.scale[0] = 1.5
-            map2.scale[1] = 1.5
+            map2.inputs['Scale'].default_value[2] = 6.00
+            map2.inputs['Scale'].default_value[0] = 1.5
+            map2.inputs['Scale'].default_value[1] = 1.5
             map2.location = (2196.6, 1510)
 
             n1 = nt.nodes.new(type="ShaderNodeTexNoise")
-            n1.inputs[1].default_value = 3.8
-            n1.inputs[2].default_value = 2.4
-            n1.inputs[3].default_value = 0.5
+            n1.inputs['Scale'].default_value = 3.8
+            n1.inputs['Detail'].default_value = 2.4
+            n1.inputs['Distortion'].default_value = 0.5
             n1.location = (2745.24, 1780)
 
             n2 = nt.nodes.new(type="ShaderNodeTexNoise")
-            n2.inputs[1].default_value = 2.0
-            n2.inputs[2].default_value = 10
-            n2.inputs[3].default_value = 0.2
+            n2.inputs['Scale'].default_value = 2.0
+            n2.inputs['Detail'].default_value = 10
+            n2.inputs['Distortion'].default_value = 0.2
             n2.location = (2745.24, 1510)
 
             ntl(n2.inputs[0], map2.outputs[0])
@@ -356,8 +356,8 @@ class dsky(Operator):
             ntl(mix1.inputs[2], sc3.outputs[0])
             ntl(sunopa.inputs[2], gam2.outputs[0])
 
-            ntl(sc1.inputs[0], n1.outputs[0])
-            ntl(sc2.inputs[0], n2.outputs[0])
+            ntl(sc1.inputs[0], n1.outputs['Fac'])
+            ntl(sc2.inputs[0], n2.outputs['Fac'])
 
             skynor = nt.nodes.new(type="ShaderNodeNormal")
             skynor.location = (3294, 1070)
@@ -458,9 +458,10 @@ class Dynapanel(Panel):
     bl_label = "Dynamic sky"
     bl_idname = "DYNSKY_PT_tools"
     bl_space_type = 'VIEW_3D'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
     bl_context = "objectmode"
-    bl_category = "Tools"
+    bl_category = "Create"
+    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         layout = self.layout

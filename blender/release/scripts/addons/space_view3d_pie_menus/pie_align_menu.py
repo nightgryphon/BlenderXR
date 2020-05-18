@@ -39,32 +39,14 @@ from bpy.props import EnumProperty
 
 
 # Pie Align - Alt + X
-class PieAlign(Menu):
-    bl_idname = "pie.align"
+class PIE_MT_Align(Menu):
+    bl_idname = "PIE_MT_align"
     bl_label = "Pie Align"
 
     def draw(self, context):
         layout = self.layout
         pie = layout.menu_pie()
         # 4 - LEFT
-        pie.operator("align.selected2xyz",
-                    text="Align X", icon='TRIA_LEFT').axis = 'X'
-        # 6 - RIGHT
-        pie.operator("align.selected2xyz",
-                    text="Align Z", icon='TRIA_DOWN').axis = 'Z'
-        # 2 - BOTTOM
-        pie.operator("align.selected2xyz",
-                    text="Align Y", icon='PLUS').axis = 'Y'
-        # 8 - TOP
-        pie.operator("align.2xyz", text="Align To Y-0").axis = '1'
-        # 7 - TOP - LEFT
-        pie.operator("align.2xyz", text="Align To X-0").axis = '0'
-        # 9 - TOP - RIGHT
-        pie.operator("align.2xyz", text="Align To Z-0").axis = '2'
-        # 1 - BOTTOM - LEFT
-        pie.separator()
-        # 3 - BOTTOM - RIGHT
-        # pie.menu("align.xyz")
         box = pie.split().box().column()
 
         row = box.row(align=True)
@@ -72,31 +54,57 @@ class PieAlign(Menu):
         align_1 = row.operator("alignxyz.all", text="Neg")
         align_1.axis = '0'
         align_1.side = 'NEGATIVE'
-        align_2 = row.operator("alignxyz.all", text="Pos")
-        align_2.axis = '0'
-        align_2.side = 'POSITIVE'
 
         row = box.row(align=True)
         row.label(text="Y")
         align_3 = row.operator("alignxyz.all", text="Neg")
         align_3.axis = '1'
         align_3.side = 'NEGATIVE'
-        align_4 = row.operator("alignxyz.all", text="Pos")
-        align_4.axis = '1'
-        align_4.side = 'POSITIVE'
 
         row = box.row(align=True)
         row.label(text="Z")
         align_5 = row.operator("alignxyz.all", text="Neg")
         align_5.axis = '2'
         align_5.side = 'NEGATIVE'
+        # 6 - RIGHT
+        box = pie.split().box().column()
+
+        row = box.row(align=True)
+        row.label(text="X")
+        align_2 = row.operator("alignxyz.all", text="Pos")
+        align_2.axis = '0'
+        align_2.side = 'POSITIVE'
+
+        row = box.row(align=True)
+        row.label(text="Y")
+        align_4 = row.operator("alignxyz.all", text="Pos")
+        align_4.axis = '1'
+        align_4.side = 'POSITIVE'
+
+        row = box.row(align=True)
+        row.label(text="Z")
         align_6 = row.operator("alignxyz.all", text="Pos")
         align_6.axis = '2'
         align_6.side = 'POSITIVE'
+        # 2 - BOTTOM
+        pie.operator("align.2xyz", text="Align To Y-0").axis = '1'
+        # 8 - TOP
+        pie.operator("align.selected2xyz",
+                    text="Align Y").axis = 'Y'
+        # 7 - TOP - LEFT
+        pie.operator("align.selected2xyz",
+                    text="Align X").axis = 'X'
+        # 9 - TOP - RIGHT
+        pie.operator("align.selected2xyz",
+                    text="Align Z").axis = 'Z'
+        # 1 - BOTTOM - LEFT
+        pie.operator("align.2xyz", text="Align To X-0").axis = '0'
+        # 3 - BOTTOM - RIGHT
+        pie.operator("align.2xyz", text="Align To Z-0").axis = '2'
 
 
 # Align to X, Y, Z
-class AlignSelectedXYZ(Operator):
+class PIE_OT_AlignSelectedXYZ(Operator):
     bl_idname = "align.selected2xyz"
     bl_label = "Align to X, Y, Z"
     bl_description = "Align Selected Along the chosen axis"
@@ -126,14 +134,13 @@ class AlignSelectedXYZ(Operator):
             }
         chosen_value = values[self.axis][0]
         constraint_value = values[self.axis][1]
-        for vert in bpy.context.object.data.vertices:
-            bpy.ops.transform.resize(
-                    value=chosen_value, constraint_axis=constraint_value,
-                    constraint_orientation='GLOBAL',
-                    mirror=False, proportional='DISABLED',
-                    proportional_edit_falloff='SMOOTH',
-                    proportional_size=1
-                    )
+        bpy.ops.transform.resize(
+            value=chosen_value,
+            constraint_axis=constraint_value,
+            orient_type='GLOBAL',
+            mirror=False,
+            use_proportional_edit=False,
+        )
         return {'FINISHED'}
 
 
@@ -141,7 +148,7 @@ class AlignSelectedXYZ(Operator):
 #    Align To 0     #
 # ################# #
 
-class AlignToXYZ0(Operator):
+class PIE_OT_AlignToXYZ0(Operator):
     bl_idname = "align.2xyz"
     bl_label = "Align To X, Y or Z = 0"
     bl_description = "Align Active Object To a chosen X, Y or Z equals 0 Location"
@@ -175,7 +182,7 @@ class AlignToXYZ0(Operator):
 
 
 # Align X Left
-class AlignXYZAll(Operator):
+class PIE_OT_AlignXYZAll(Operator):
     bl_idname = "alignxyz.all"
     bl_label = "Align to Front/Back Axis"
     bl_description = "Align to a Front or Back along the chosen Axis"
@@ -236,10 +243,10 @@ class AlignXYZAll(Operator):
 
 
 classes = (
-    PieAlign,
-    AlignSelectedXYZ,
-    AlignToXYZ0,
-    AlignXYZAll,
+    PIE_MT_Align,
+    PIE_OT_AlignSelectedXYZ,
+    PIE_OT_AlignToXYZ0,
+    PIE_OT_AlignXYZAll,
     )
 
 addon_keymaps = []
@@ -254,7 +261,7 @@ def register():
         # Align
         km = wm.keyconfigs.addon.keymaps.new(name='Mesh')
         kmi = km.keymap_items.new('wm.call_menu_pie', 'X', 'PRESS', alt=True)
-        kmi.properties.name = "pie.align"
+        kmi.properties.name = "PIE_MT_align"
         addon_keymaps.append((km, kmi))
 
 

@@ -24,6 +24,7 @@ import bpy
 import os.path
 from bpy_extras.io_utils import ImportHelper
 from bpy_extras import object_utils
+from bpy.utils import register_class
 from math import atan, pi, degrees, sqrt, cos, sin
 
 
@@ -50,7 +51,7 @@ def pov_define_mesh(mesh, verts, edges, faces, name, hide_geometry=True):
         mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts, edges, faces)
     mesh.update()
-    mesh.validate(False)  # Set it to True to see debug messages (helps ensure you generate valid geometry).
+    mesh.validate(verbose = False)  # Set it to True to see debug messages (helps ensure you generate valid geometry).
     if hide_geometry:
         mesh.vertices.foreach_set("hide", [True] * len(mesh.vertices))
         mesh.edges.foreach_set("hide", [True] * len(mesh.edges))
@@ -66,12 +67,12 @@ class POVRAY_OT_lathe_add(bpy.types.Operator):
 
 
     def execute(self, context):
-        layers=[False]*20
-        layers[0]=True
+        #ayers=[False]*20
+        #layers[0]=True
         bpy.ops.curve.primitive_bezier_curve_add(
-            location=context.scene.cursor_location,
+            location=context.scene.cursor.location,
             rotation=(0, 0, 0),
-            layers=layers,
+            #layers=layers,
         )
         ob = context.view_layer.objects.active
         ob_data = ob.data
@@ -188,8 +189,7 @@ def pov_superellipsoid_define(context, op, ob):
         mesh = pov_define_mesh(mesh, verts, [], faces, "SuperEllipsoid")
 
         if not ob:
-            ob_base = object_utils.object_data_add(context, mesh, operator=None)
-            ob = ob_base.object
+            ob = object_utils.object_data_add(context, mesh, operator=None)
             #engine = context.scene.render.engine what for?
             ob = context.object
             ob.name =  ob.data.name = "PovSuperellipsoid"
@@ -394,9 +394,7 @@ def pov_supertorus_define(context, op, ob):
                                   st_n2)
         mesh = pov_define_mesh(mesh, verts, [], faces, "PovSuperTorus", True)
         if not ob:
-            ob_base = object_utils.object_data_add(context, mesh, operator=None)
-
-            ob = ob_base.object
+            ob = object_utils.object_data_add(context, mesh, operator=None)
             ob.pov.object_as = 'SUPERTORUS'
             ob.pov.st_major_radius = st_R
             ob.pov.st_minor_radius = st_r
@@ -583,8 +581,8 @@ class POVRAY_OT_loft_add(bpy.types.Operator):
             nurbs.use_cyclic_u = True
         ob = bpy.data.objects.new('Loft_shape', loftData)
         scn = bpy.context.scene
-        scn.objects.link(ob)
-        scn.objects.active = ob
+        scn.collection.objects.link(ob)
+        context.view_layer.objects.active = ob
         ob.select_set(True)
         ob.pov.curveshape = "loft"
         return {'FINISHED'}
@@ -596,9 +594,9 @@ class POVRAY_OT_plane_add(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self,context):
-        layers = 20*[False]
-        layers[0] = True
-        bpy.ops.mesh.primitive_plane_add(radius = 100000,layers=layers)
+        #layers = 20*[False]
+        #layers[0] = True
+        bpy.ops.mesh.primitive_plane_add(size = 100000)
         ob = context.object
         ob.name = ob.data.name = 'PovInfinitePlane'
         bpy.ops.object.mode_set(mode="EDIT")
@@ -617,9 +615,9 @@ class POVRAY_OT_box_add(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self,context):
-        layers = 20*[False]
-        layers[0] = True
-        bpy.ops.mesh.primitive_cube_add(layers=layers)
+        # layers = 20*[False]
+        # layers[0] = True
+        bpy.ops.mesh.primitive_cube_add()
         ob = context.object
         ob.name = ob.data.name = 'PovBox'
         bpy.ops.object.mode_set(mode="EDIT")
@@ -634,14 +632,14 @@ class POVRAY_OT_box_add(bpy.types.Operator):
 def pov_cylinder_define(context, op, ob, radius, loc, loc_cap):
     if op:
         R = op.R
-        loc = bpy.context.scene.cursor_location
+        loc = bpy.context.scene.cursor.location
         loc_cap[0] = loc[0]
         loc_cap[1] = loc[1]
         loc_cap[2] = (loc[2]+2)
     vec = Vector(loc_cap) - Vector(loc)
     depth = vec.length
     rot = Vector((0, 0, 1)).rotation_difference(vec)  # Rotation from Z axis.
-    trans = rot * Vector((0, 0, depth / 2)) # Such that origin is at center of the base of the cylinder.
+    trans = rot @ Vector((0, 0, depth / 2)) # Such that origin is at center of the base of the cylinder.
     roteuler = rot.to_euler()
     if not ob:
         bpy.ops.object.add(type='MESH', location=loc)
@@ -688,8 +686,8 @@ class POVRAY_OT_cylinder_add(bpy.types.Operator):
         props = self.properties
         R = props.R
         ob = context.object
-        layers = 20*[False]
-        layers[0] = True
+        #layers = 20*[False]
+        #layers[0] = True
         if ob:
             if ob.pov.imported_cyl_loc:
                 LOC = ob.pov.imported_cyl_loc
@@ -697,7 +695,7 @@ class POVRAY_OT_cylinder_add(bpy.types.Operator):
                 LOC_CAP = ob.pov.imported_cyl_loc_cap
         else:
             if not props.imported_cyl_loc:
-                LOC_CAP = LOC = bpy.context.scene.cursor_location
+                LOC_CAP = LOC = bpy.context.scene.cursor.location
                 LOC_CAP[2] += 2.0
             else:
                 LOC = props.imported_cyl_loc
@@ -738,7 +736,7 @@ class POVRAY_OT_cylinder_update(bpy.types.Operator):
 def pov_sphere_define(context, op, ob, loc):
         if op:
             R = op.R
-            loc = bpy.context.scene.cursor_location
+            loc = bpy.context.scene.cursor.location
         else:
             assert(ob)
             R = ob.pov.sphere_radius
@@ -752,8 +750,8 @@ def pov_sphere_define(context, op, ob, loc):
             bpy.ops.mesh.reveal()
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.mesh.delete(type='VERT')
-            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, size=ob.pov.sphere_radius, location=loc, rotation=obrot)
-            #bpy.ops.transform.rotate(axis=obrot,constraint_orientation='GLOBAL')
+            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=ob.pov.sphere_radius, location=loc, rotation=obrot)
+            #bpy.ops.transform.rotate(axis=obrot,orient_type='GLOBAL')
             bpy.ops.transform.resize(value=obscale)
             #bpy.ops.transform.rotate(axis=obrot, proportional_size=1)
 
@@ -761,10 +759,10 @@ def pov_sphere_define(context, op, ob, loc):
             bpy.ops.mesh.hide(unselected=False)
             bpy.ops.object.mode_set(mode="OBJECT")
             bpy.ops.object.shade_smooth()
-            #bpy.ops.transform.rotate(axis=obrot,constraint_orientation='GLOBAL')
+            #bpy.ops.transform.rotate(axis=obrot,orient_type='GLOBAL')
 
         if not ob:
-            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, size=R, location=loc)
+            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=R, location=loc)
             ob = context.object
             ob.name =  ob.data.name = "PovSphere"
             ob.pov.object_as = "SPHERE"
@@ -799,7 +797,7 @@ class POVRAY_OT_sphere_add(bpy.types.Operator):
                 LOC = ob.pov.imported_loc
         else:
             if not props.imported_loc:
-                LOC = bpy.context.scene.cursor_location
+                LOC = bpy.context.scene.cursor.location
 
             else:
                 LOC = props.imported_loc
@@ -810,10 +808,10 @@ class POVRAY_OT_sphere_add(bpy.types.Operator):
         return {'FINISHED'}
 
     # def execute(self,context):
-        # layers = 20*[False]
-        # layers[0] = True
+        ## layers = 20*[False]
+        ## layers[0] = True
 
-        # bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=ob.pov.sphere_radius, layers=layers)
+        # bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=ob.pov.sphere_radius)
         # ob = context.object
         # bpy.ops.object.mode_set(mode="EDIT")
         # self.report({'INFO'}, "This native POV-Ray primitive "
@@ -895,8 +893,7 @@ def pov_cone_define(context, op, ob):
 
     mesh = pov_define_mesh(mesh, verts, [], faces, "PovCone", True)
     if not ob:
-        ob_base = object_utils.object_data_add(context, mesh, operator=None)
-        ob = ob_base.object
+        ob = object_utils.object_data_add(context, mesh, operator=None)
         ob.pov.object_as = "CONE"
         ob.pov.cone_base_radius = base
         ob.pov.cone_cap_radius = cap
@@ -972,9 +969,9 @@ class POVRAY_OT_isosurface_box_add(bpy.types.Operator):
 
 
     def execute(self,context):
-        layers = 20*[False]
-        layers[0] = True
-        bpy.ops.mesh.primitive_cube_add(layers = layers)
+        #layers = 20*[False]
+        #layers[0] = True
+        bpy.ops.mesh.primitive_cube_add()
         ob = context.object
         bpy.ops.object.mode_set(mode="EDIT")
         self.report({'INFO'}, "This native POV-Ray primitive "
@@ -994,9 +991,9 @@ class POVRAY_OT_isosurface_sphere_add(bpy.types.Operator):
 
 
     def execute(self,context):
-        layers = 20*[False]
-        layers[0] = True
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4,layers=layers)
+        #layers = 20*[False]
+        #layers[0] = True
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4)
         ob = context.object
         bpy.ops.object.mode_set(mode="EDIT")
         self.report({'INFO'}, "This native POV-Ray primitive "
@@ -1016,9 +1013,9 @@ class POVRAY_OT_sphere_sweep_add(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self,context):
-        layers = 20*[False]
-        layers[0] = True
-        bpy.ops.curve.primitive_nurbs_curve_add(layers = layers)
+        #layers = 20*[False]
+        #layers[0] = True
+        bpy.ops.curve.primitive_nurbs_curve_add()
         ob = context.object
         ob.name = ob.data.name = "PovSphereSweep"
         ob.pov.curveshape = "sphere_sweep"
@@ -1036,9 +1033,9 @@ class POVRAY_OT_blob_add(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self,context):
-        layers = 20*[False]
-        layers[0] = True
-        bpy.ops.object.metaball_add(type = 'BALL',layers = layers)
+        #layers = 20*[False]
+        #layers[0] = True
+        bpy.ops.object.metaball_add(type = 'BALL')
         ob = context.object
         ob.name = "PovBlob"
         return {'FINISHED'}
@@ -1131,14 +1128,14 @@ class POVRAY_OT_height_field_add(bpy.types.Operator, ImportHelper):
         mat = bpy.data.materials.new('Tex_%s_hf'%im_name)
         hf_slot = mat.texture_slots.create(-1)
         hf_slot.texture = hf_tex
-        layers = 20*[False]
-        layers[0] = True
+        #layers = 20*[False]
+        #layers[0] = True
         quality = props.quality
         res = 100/quality
         w,h = hf_tex.image.size[:]
         w = int(w/res)
         h = int(h/res)
-        bpy.ops.mesh.primitive_grid_add(x_subdivisions=w, y_subdivisions=h,radius = 0.5,layers=layers)
+        bpy.ops.mesh.primitive_grid_add(x_subdivisions=w, y_subdivisions=h,radius = 0.5)
         ob = context.object
         ob.name = ob.data.name = '%s'%im_name
         ob.data.materials.append(mat)
@@ -1273,7 +1270,7 @@ class POVRAY_OT_prism_add(bpy.types.Operator):
         loftData = bpy.data.curves.new('Prism', type='CURVE')
         loftData.dimensions = '2D'
         loftData.resolution_u = 2
-        loftData.show_normal_face = False
+        #loftData.show_normal_face = False
         loftData.extrude = 2
         n=props.prism_n
         r=props.prism_r
@@ -1294,8 +1291,8 @@ class POVRAY_OT_prism_add(bpy.types.Operator):
 
         ob = bpy.data.objects.new('Prism_shape', loftData)
         scn = bpy.context.scene
-        scn.objects.link(ob)
-        scn.objects.active = ob
+        scn.collection.objects.link(ob)
+        context.view_layer.objects.active = ob
         ob.select_set(True)
         ob.pov.curveshape = "prism"
         ob.name = ob.data.name = "Prism"
@@ -1327,7 +1324,7 @@ def pov_parametric_define(context, op, ob):
             obrot = ob.rotation_euler # In radians
             #Parametric addon has no loc rot, some extra work is needed
             #in case cursor has moved
-            curloc = bpy.context.scene.cursor_location
+            curloc = bpy.context.scene.cursor.location
 
 
             bpy.ops.object.mode_set(mode="EDIT")
@@ -1447,20 +1444,20 @@ class POVRAY_OT_shape_polygon_to_circle_add(bpy.types.Operator):
         ngonR = props.polytocircle_ngonR
         circleR = props.polytocircle_circleR
         resolution = props.polytocircle_resolution
-        layers = 20*[False]
-        layers[0] = True
-        bpy.ops.mesh.primitive_circle_add(vertices=ngon, radius=ngonR, fill_type='NGON',enter_editmode=True, layers=layers)
+        #layers = 20*[False]
+        #layers[0] = True
+        bpy.ops.mesh.primitive_circle_add(vertices=ngon, radius=ngonR, fill_type='NGON',enter_editmode=True)
         bpy.ops.transform.translate(value=(0, 0, 1))
         bpy.ops.mesh.subdivide(number_cuts=resolution)
         numCircleVerts = ngon + (ngon*resolution)
         bpy.ops.mesh.select_all(action='DESELECT')
-        bpy.ops.mesh.primitive_circle_add(vertices=numCircleVerts, radius=circleR, fill_type='NGON',enter_editmode=True, layers=layers)
+        bpy.ops.mesh.primitive_circle_add(vertices=numCircleVerts, radius=circleR, fill_type='NGON',enter_editmode=True)
         bpy.ops.transform.translate(value=(0, 0, -1))
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.mesh.bridge_edge_loops()
         if ngon < 5:
             bpy.ops.mesh.select_all(action='DESELECT')
-            bpy.ops.mesh.primitive_circle_add(vertices=ngon, radius=ngonR, fill_type='TRIFAN',enter_editmode=True, layers=layers)
+            bpy.ops.mesh.primitive_circle_add(vertices=ngon, radius=ngonR, fill_type='TRIFAN',enter_editmode=True)
             bpy.ops.transform.translate(value=(0, 0, 1))
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.mesh.remove_doubles()
@@ -1697,7 +1694,7 @@ class ImportPOV(bpy.types.Operator, ImportHelper):
                                 vec = Vector(imported_cyl_loc_cap ) - Vector(imported_cyl_loc)
                                 depth = vec.length
                                 rot = Vector((0, 0, 1)).rotation_difference(vec)  # Rotation from Z axis.
-                                trans = rot * Vector((0, 0, depth / 2)) # Such that origin is at center of the base of the cylinder.
+                                trans = rot @ Vector((0, 0, depth / 2)) # Such that origin is at center of the base of the cylinder.
                                 #center = ((x0 + x1)/2,(y0 + y1)/2,(z0 + z1)/2)
                                 scaleZ = sqrt((x1-x0)**2+(y1-y0)**2+(z1-z0)**2)/2
                                 bpy.ops.pov.addcylinder(R=r, imported_cyl_loc=imported_cyl_loc, imported_cyl_loc_cap=imported_cyl_loc_cap)
@@ -1710,7 +1707,7 @@ class ImportPOV(bpy.types.Operator, ImportHelper):
                                 # bpy.ops.object.mode_set(mode='EDIT')
                                 # bpy.ops.mesh.reveal()
                                 # bpy.ops.mesh.select_all(action='SELECT')
-                                # bpy.ops.transform.resize(value=(1,1,scaleZ), constraint_orientation='LOCAL')
+                                # bpy.ops.transform.resize(value=(1,1,scaleZ), orient_type='LOCAL')
                                 # bpy.ops.mesh.hide(unselected=False)
                                 # bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -1821,8 +1818,7 @@ class ImportPOV(bpy.types.Operator, ImportHelper):
                                     materials.append((int(cache[m0]),int(cache[m1]),int(cache[m2])))
                                     faces.append((int(cache[v0]),int(cache[v1]),int(cache[v2])))
                             #mesh = pov_define_mesh(None, verts, [], faces, name, hide_geometry=False)
-                            #ob_base = object_utils.object_data_add(context, mesh, operator=None)
-                            #ob = ob_base.object
+                            #ob = object_utils.object_data_add(context, mesh, operator=None)
 
                             me = bpy.data.meshes.new(name) ########
                             ob = bpy.data.objects.new(name, me) ##########
@@ -1907,7 +1903,7 @@ class ImportPOV(bpy.types.Operator, ImportHelper):
                                     # ob.data.materials.append(bpy.data.materials[matNames[i]])
 
         ##To keep Avogadro Camera angle:
-        # for obj in bpy.context.scene.objects:
+        # for obj in bpy.context.view_layer.objects:
             # if obj.type == "CAMERA":
                 # track = obj.constraints.new(type = "TRACK_TO")
                 # track.target = ob
@@ -1915,3 +1911,47 @@ class ImportPOV(bpy.types.Operator, ImportHelper):
                 # track.up_axis = "UP_Y"
                 # obj.location = (0,0,0)
         return {'FINISHED'}
+
+classes = (
+    POVRAY_OT_lathe_add,
+    POVRAY_OT_superellipsoid_add,
+    POVRAY_OT_superellipsoid_update,
+    POVRAY_OT_supertorus_add,
+    POVRAY_OT_supertorus_update,
+    POVRAY_OT_loft_add,
+    POVRAY_OT_plane_add,
+    POVRAY_OT_box_add,
+    POVRAY_OT_cylinder_add,
+    POVRAY_OT_cylinder_update,
+    POVRAY_OT_sphere_add,
+    POVRAY_OT_sphere_update,
+    POVRAY_OT_cone_add,
+    POVRAY_OT_cone_update,
+    POVRAY_OT_isosurface_box_add,
+    POVRAY_OT_isosurface_sphere_add,
+    POVRAY_OT_sphere_sweep_add,
+    POVRAY_OT_blob_add,
+    POVRAY_OT_rainbow_add,
+    POVRAY_OT_height_field_add,
+    POVRAY_OT_torus_add,
+    POVRAY_OT_torus_update,
+    POVRAY_OT_prism_add,
+    POVRAY_OT_parametric_add,
+    POVRAY_OT_parametric_update,
+    POVRAY_OT_shape_polygon_to_circle_add,
+    ImportPOV,
+)
+
+
+def register():
+    #from bpy.utils import register_class
+
+    for cls in classes:
+        register_class(cls)
+
+
+def unregister():
+    from bpy.utils import unregister_class
+
+    for cls in classes:
+        unregister_class(cls)

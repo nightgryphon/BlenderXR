@@ -58,14 +58,51 @@ def line_value(line_split):
         return b' '.join(line_split[1:])
 
 
+def filenames_group_by_ext(line, ext):
+    """
+    Splits material libraries supporting spaces, so:
+    b'foo bar.mtl baz spam.MTL' -> (b'foo bar.mtl', b'baz spam.MTL')
+    Also handle " chars (some software use those to protect filenames with spaces, see T67266... sic).
+    """
+    # Note that we assume that if there are some " in that line,
+    # then all filenames are properly enclosed within those...
+    start = line.find(b'"') + 1
+    if start != 0:
+        while start != 0:
+            end = line.find(b'"', start)
+            if end != -1:
+                yield line[start:end]
+                start = line.find(b'"', end + 1) + 1
+            else:
+                break
+        return
+
+    line_lower = line.lower()
+    i_prev = 0
+    while i_prev != -1 and i_prev < len(line):
+        i = line_lower.find(ext, i_prev)
+        if i != -1:
+            i += len(ext)
+        yield line[i_prev:i].strip()
+        i_prev = i
+
+
 def obj_image_load(context_imagepath_map, line, DIR, recursive, relpath):
     """
     Mainly uses comprehensiveImageLoad
     But we try all space-separated items from current line when file is not found with last one
     (users keep generating/using image files with spaces in a format that does not support them, sigh...)
     Also tries to replace '_' with ' ' for Max's exporter replaces spaces with underscores.
+    Also handle " chars (some software use those to protect filenames with spaces, see T67266... sic).
     """
     filepath_parts = line.split(b' ')
+
+    start = line.find(b'"') + 1
+    if start != 0:
+        end = line.find(b'"', start)
+        if end != 0:
+            filepath_parts = (line[start:end],)
+
     image = None
     for i in range(-1, -len(filepath_parts), -1):
         imagepath = os.fsdecode(b" ".join(filepath_parts[i:]))
@@ -150,8 +187,7 @@ def create_materials(filepath, relpath,
             _generic_tex_set(mat_wrap.specular_texture, image, 'UV', map_offset, map_scale)
 
         elif type == 'Ke':
-            # XXX Not supported?
-            print("WARNING, currently unsupported emit texture, skipped.")
+            _generic_tex_set(mat_wrap.emission_color_texture, image, 'UV', map_offset, map_scale)
 
         elif type == 'Bump':
             bump_mult = map_options.get(b'-bm')
@@ -161,7 +197,7 @@ def create_materials(filepath, relpath,
             _generic_tex_set(mat_wrap.normalmap_texture, image, 'UV', map_offset, map_scale)
 
         elif type == 'D':
-            _generic_tex_set(mat_wrap.transmission_texture, image, 'UV', map_offset, map_scale)
+            _generic_tex_set(mat_wrap.alpha_texture, image, 'UV', map_offset, map_scale)
 
         elif type == 'disp':
             # XXX Not supported?
@@ -181,7 +217,7 @@ def create_materials(filepath, relpath,
         else:
             raise Exception("invalid type %r" % type)
 
-    def finalize_material(context_material, context_material_vars, spec_colors, emit_colors,
+    def finalize_material(context_material, context_material_vars, spec_colors,
                           do_highlight, do_reflection, do_transparency, do_glass):
         # Finalize previous mat, if any.
         if context_material:
@@ -199,14 +235,6 @@ def create_materials(filepath, relpath,
                 context_mat_wrap.specular_tint = 0.0
                 if "roughness" not in context_material_vars:
                     context_mat_wrap.roughness = 0.0
-
-
-            emit_value = sum(emit_colors) / 3.0
-            if emit_value > 1e-6:
-                print("WARNING, emit value unsupported by Principled BSDF shader, skipped.")
-                # We have to adapt it to diffuse color too...
-                emit_value /= sum(tuple(context_material.diffuse_color)[:3]) / 3.0
-            # ~ context_material.emit = emit_value
 
             # FIXME, how else to use this?
             if do_highlight:
@@ -230,8 +258,8 @@ def create_materials(filepath, relpath,
             if do_transparency:
                 if "ior" not in context_material_vars:
                     context_mat_wrap.ior = 1.0
-                if "transmission" not in context_material_vars:
-                    context_mat_wrap.transmission = 1.0
+                if "alpha" not in context_material_vars:
+                    context_mat_wrap.alpha = 1.0
                 # EEVEE only
                 context_material.blend_method = 'BLEND'
 
@@ -266,7 +294,6 @@ def create_materials(filepath, relpath,
             do_transparency = False
             do_glass = False
             spec_colors = [0.0, 0.0, 0.0]
-            emit_colors = [0.0, 0.0, 0.0]
 
             # print('\t\tloading mtl: %e' % mtlpath)
             context_material = None
@@ -282,7 +309,7 @@ def create_materials(filepath, relpath,
 
                 if line_id == b'newmtl':
                     # Finalize previous mat, if any.
-                    finalize_material(context_material, context_material_vars, spec_colors, emit_colors,
+                    finalize_material(context_material, context_material_vars, spec_colors,
                                       do_highlight, do_reflection, do_transparency, do_glass)
 
                     context_material_name = line_value(line_split)
@@ -291,8 +318,7 @@ def create_materials(filepath, relpath,
                         context_mat_wrap = nodal_material_wrap_map[context_material]
                     context_material_vars.clear()
 
-                    spec_colors = [0.0, 0.0, 0.0]
-                    emit_colors[:] = [0.0, 0.0, 0.0]
+                    spec_colors[:] = [0.0, 0.0, 0.0]
                     do_highlight = False
                     do_reflection = False
                     do_transparency = False
@@ -315,19 +341,20 @@ def create_materials(filepath, relpath,
                     elif line_id == b'ke':
                         # We cannot set context_material.emit right now, we need final diffuse color as well for this.
                         # XXX Unsupported currently
-                        emit_colors[:] = [
-                            float_func(line_split[1]), float_func(line_split[2]), float_func(line_split[3])]
+                        col = (float_func(line_split[1]), float_func(line_split[2]), float_func(line_split[3]))
+                        context_mat_wrap.emission_color = col
                     elif line_id == b'ns':
                         # XXX Totally empirical conversion, trying to adapt it
                         #     (from 0.0 - 900.0 OBJ specular exponent range to 1.0 - 0.0 Principled BSDF range)...
-                        context_mat_wrap.roughness = 1.0 - (sqrt(float_func(line_split[1])) / 30)
+                        val = max(0.0, min(900.0, float_func(line_split[1])))
+                        context_mat_wrap.roughness = 1.0 - (sqrt(val) / 30)
                         context_material_vars.add("roughness")
                     elif line_id == b'ni':  # Refraction index (between 0.001 and 10).
                         context_mat_wrap.ior = float_func(line_split[1])
                         context_material_vars.add("ior")
                     elif line_id == b'd':  # dissolve (transparency)
-                        context_mat_wrap.transmission = 1.0 - float_func(line_split[1])
-                        context_material_vars.add("transmission")
+                        context_mat_wrap.alpha = float_func(line_split[1])
+                        context_material_vars.add("alpha")
                     elif line_id == b'tr':  # translucency
                         print("WARNING, currently unsupported 'tr' translucency option, skipped.")
                     elif line_id == b'tf':
@@ -431,9 +458,16 @@ def create_materials(filepath, relpath,
                         print("WARNING: %r:%r (ignored)" % (filepath, line))
 
             # Finalize last mat, if any.
-            finalize_material(context_material, context_material_vars, spec_colors, emit_colors,
+            finalize_material(context_material, context_material_vars, spec_colors,
                               do_highlight, do_reflection, do_transparency, do_glass)
             mtl.close()
+
+
+def face_is_edge(face):
+    """Simple check to test whether given (temp, working) data is an edge, and not a real face."""
+    face_vert_loc_indices = face[0]
+    face_vert_nor_indices = face[1]
+    return len(face_vert_nor_indices) == 1 or len(face_vert_loc_indices) == 2
 
 
 def split_mesh(verts_loc, faces, unique_materials, filepath, SPLIT_OB_OR_GROUP):
@@ -481,12 +515,12 @@ def split_mesh(verts_loc, faces, unique_materials, filepath, SPLIT_OB_OR_GROUP):
              use_verts_nor, use_verts_tex) = face_split_dict.setdefault(key, ([], [], {}, {}, [], []))
             oldkey = key
 
+        if not face_is_edge(face):
+            if not use_verts_nor and face_vert_nor_indices:
+                use_verts_nor.append(True)
 
-        if not use_verts_nor and face_vert_nor_indices:
-            use_verts_nor.append(True)
-
-        if not use_verts_tex and face_vert_tex_indices:
-            use_verts_tex.append(True)
+            if not use_verts_tex and face_vert_tex_indices:
+                use_verts_tex.append(True)
 
         # Remap verts to new vert list and add where needed
         for loop_idx, vert_idx in enumerate(face_vert_loc_indices):
@@ -538,6 +572,8 @@ def create_mesh(new_objects,
 
     # reverse loop through face indices
     for f_idx in range(len(faces) - 1, -1, -1):
+        face = faces[f_idx]
+
         (face_vert_loc_indices,
          face_vert_nor_indices,
          face_vert_tex_indices,
@@ -545,7 +581,7 @@ def create_mesh(new_objects,
          context_smooth_group,
          context_object_key,
          face_invalid_blenpoly,
-         ) = faces[f_idx]
+         ) = face
 
         len_face_vert_loc_indices = len(face_vert_loc_indices)
 
@@ -553,7 +589,7 @@ def create_mesh(new_objects,
             faces.pop(f_idx)  # cant add single vert faces
 
         # Face with a single item in face_vert_nor_indices is actually a polyline!
-        elif len(face_vert_nor_indices) == 1 or len_face_vert_loc_indices == 2:
+        elif face_is_edge(face):
             if use_edges:
                 edges.extend((face_vert_loc_indices[i], face_vert_loc_indices[i + 1])
                              for i in range(len_face_vert_loc_indices - 1))
@@ -672,12 +708,18 @@ def create_mesh(new_objects,
         # Note: we store 'temp' normals in loops, since validate() may alter final mesh,
         #       we can only set custom lnors *after* calling it.
         me.create_normals_split()
-        loops_nor = tuple(no for (_, face_vert_nor_indices, _, _, _, _, _) in faces for face_noidx in face_vert_nor_indices for no in verts_nor[face_noidx])
+        loops_nor = tuple(no for (_, face_vert_nor_indices, _, _, _, _, _) in faces
+                             for face_noidx in face_vert_nor_indices
+                             for no in verts_nor[face_noidx])
         me.loops.foreach_set("normal", loops_nor)
 
     if verts_tex and me.polygons:
-        me.uv_layers.new()
-        loops_uv = tuple(uv for (_, _, face_vert_tex_indices, _, _, _, _) in faces for face_uvidx in face_vert_tex_indices for uv in verts_tex[face_uvidx])
+        # Some files Do not explicitely write the 'v' value when it's 0.0, see T68249...
+        verts_tex = [uv if len(uv) == 2 else uv + [0.0] for uv in verts_tex]
+        me.uv_layers.new(do_init=False)
+        loops_uv = tuple(uv for (_, _, face_vert_tex_indices, _, _, _, _) in faces
+                            for face_uvidx in face_vert_tex_indices
+                            for uv in verts_tex[face_uvidx])
         me.uv_layers[0].data.foreach_set("uv", loops_uv)
 
     use_edges = use_edges and bool(edges)
@@ -687,7 +729,7 @@ def create_mesh(new_objects,
         me.edges.foreach_set("vertices", unpack_list(edges))
 
     me.validate(clean_customdata=False)  # *Very* important to not remove lnors here!
-    me.update(calc_edges=use_edges)
+    me.update(calc_edges=use_edges, calc_edges_loose=use_edges)
 
     # Un-tessellate as much as possible, in case we had to triangulate some ngons...
     if fgon_edges:
@@ -865,6 +907,8 @@ def load(context,
     """
     def unique_name(existing_names, name_orig):
         i = 0
+        if name_orig is None:
+            name_orig = b"ObjObject"
         name = name_orig
         while name in existing_names:
             name = b"%s.%03d" % (name_orig, i)
@@ -989,7 +1033,7 @@ def load(context,
                 if vdata_len:
                     if do_quick_vert:
                         try:
-                            vdata.append(tuple(map(float_func, line_split[1:vdata_len + 1])))
+                            vdata.append(list(map(float_func, line_split[1:vdata_len + 1])))
                         except:
                             do_quick_vert = False
                             # In case we get too many failures on quick parsing, force fallback to full multi-line one.
@@ -999,7 +1043,8 @@ def load(context,
                                 skip_quick_vert = True
                     if not do_quick_vert:
                         context_multi_line = handle_vec(line_start, context_multi_line, line_split,
-                                                        context_multi_line or line_start, vdata, vec, vdata_len)
+                                                        context_multi_line or line_start,
+                                                        vdata, vec, vdata_len)
 
                 elif line_start == b'f' or context_multi_line == b'f':
                     if not context_multi_line:
@@ -1076,6 +1121,8 @@ def load(context,
                         #     as a polyline, and not a regular face...
                         face[1][:] = [True]
                         faces.append(face)
+                        if context_material is None:
+                            use_default_material = True
                     # Else, use face_vert_loc_indices previously defined and used the obj_face
 
                     context_multi_line = b'l' if strip_slash(line_split) else b''
@@ -1118,7 +1165,8 @@ def load(context,
                 elif line_start == b'mtllib':  # usemap or usemat
                     # can have multiple mtllib filenames per line, mtllib can appear more than once,
                     # so make sure only occurrence of material exists
-                    material_libs |= {os.fsdecode(f) for f in line.split()[1:]}
+                    material_libs |= {os.fsdecode(f) for f in filenames_group_by_ext(line.lstrip()[7:].strip(), b'.mtl')
+                    }
 
                     # Nurbs support
                 elif line_start == b'cstype':
@@ -1227,7 +1275,7 @@ def load(context,
             # we could apply this anywhere before scaling.
             obj.matrix_world = global_matrix
 
-        scene.update()
+        view_layer.update()
 
         axis_min = [1000000000] * 3
         axis_max = [-1000000000] * 3

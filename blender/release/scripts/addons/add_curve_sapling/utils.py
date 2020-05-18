@@ -737,7 +737,6 @@ def create_armature(armAnim, leafP, cu, frameRate, leafMesh, leafObj, leafVertSi
     armOb.animation_data_create()
     armOb.animation_data.action = newAction
     arm.display_type = 'STICK'
-    arm.use_deform_delay = True
     # Add the armature modifier to the curve
     armMod = treeOb.modifiers.new('windSway', 'ARMATURE')
     if previewArm:
@@ -756,7 +755,7 @@ def create_armature(armAnim, leafP, cu, frameRate, leafMesh, leafObj, leafVertSi
         armMod.use_vertex_groups = True
 
     # Make sure all objects are deselected (may not be required?)
-    for ob in bpy.data.objects:
+    for ob in bpy.context.view_layer.objects:
         ob.select_set(state=False)
 
     fps = bpy.context.scene.render.fps
@@ -1359,7 +1358,7 @@ def perform_pruning(baseSize, baseSplits, childP, cu, currentMax, currentMin, cu
                         stemsegL, lengthV[n], taperCrown, boneStep, rotate, rotateV
                         )
 
-        # If pruning is enabled then we must to the check to see if the end of the spline is within the evelope
+        # If pruning is enabled then we must check to see if the end of the spline is within the envelope
         if prune:
             # Check each endpoint to see if it is inside
             for s in splineList:
@@ -1595,7 +1594,7 @@ def addTree(props):
     else:
         handles = 'VECTOR'
 
-    for ob in bpy.data.objects:
+    for ob in bpy.context.view_layer.objects:
         ob.select_set(state=False)
 
     # Initialise the tree object and curve and adjust the settings
@@ -1603,7 +1602,7 @@ def addTree(props):
     treeOb = bpy.data.objects.new('tree', cu)
     bpy.context.scene.collection.objects.link(treeOb)
 
-    # treeOb.location=bpy.context.scene.cursor_location attractUp
+    # treeOb.location=bpy.context.scene.cursor.location attractUp
 
     cu.dimensions = '3D'
     cu.fill_mode = 'FULL'

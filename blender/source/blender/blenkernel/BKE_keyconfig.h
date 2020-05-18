@@ -16,21 +16,24 @@
 #ifndef __BKE_KEYCONFIG_H__
 #define __BKE_KEYCONFIG_H__
 
-/** \file \ingroup bke
+/** \file
+ * \ingroup bke
  */
 
 /** Based on #BKE_addon_pref_type_init and friends */
 
 struct UserDef;
 struct wmKeyConfigPref;
+struct wmKeyMap;
+struct wmKeyMapItem;
 
 /** Actual data is stored in #wmKeyConfigPref. */
 #if defined(__RNA_TYPES_H__)
 typedef struct wmKeyConfigPrefType_Runtime {
-	char idname[64];
+  char idname[64];
 
-	/* RNA integration */
-	ExtensionRNA ext;
+  /* RNA integration */
+  ExtensionRNA ext;
 } wmKeyConfigPrefType_Runtime;
 
 #else
@@ -45,9 +48,25 @@ struct wmKeyConfigPrefType_Runtime *BKE_keyconfig_pref_type_find(const char *idn
 void BKE_keyconfig_pref_type_add(struct wmKeyConfigPrefType_Runtime *kpt_rt);
 void BKE_keyconfig_pref_type_remove(const struct wmKeyConfigPrefType_Runtime *kpt_rt);
 
-void BKE_keyconfig_pref_set_select_mouse(struct UserDef *userdef, int value, bool override);
-
 void BKE_keyconfig_pref_type_init(void);
 void BKE_keyconfig_pref_type_free(void);
 
-#endif  /* __BKE_KEYCONFIG_H__ */
+/* Versioning. */
+void BKE_keyconfig_pref_set_select_mouse(struct UserDef *userdef, int value, bool override);
+
+struct wmKeyConfigFilterItemParams {
+  uint check_item : 1;
+  uint check_diff_item_add : 1;
+  uint check_diff_item_remove : 1;
+};
+
+void BKE_keyconfig_keymap_filter_item(struct wmKeyMap *keymap,
+                                      const struct wmKeyConfigFilterItemParams *params,
+                                      bool (*filter_fn)(struct wmKeyMapItem *kmi, void *user_data),
+                                      void *user_data);
+void BKE_keyconfig_pref_filter_items(struct UserDef *userdef,
+                                     const struct wmKeyConfigFilterItemParams *params,
+                                     bool (*filter_fn)(struct wmKeyMapItem *kmi, void *user_data),
+                                     void *user_data);
+
+#endif /* __BKE_KEYCONFIG_H__ */

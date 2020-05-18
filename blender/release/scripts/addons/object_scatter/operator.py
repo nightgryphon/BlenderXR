@@ -392,8 +392,9 @@ def create_line_strip_batch(coords):
 
 def draw_text(location, text, size=15, color=(1, 1, 1, 1)):
     font_id = 0
+    ui_scale = bpy.context.preferences.system.ui_scale
     blf.position(font_id, *location)
-    blf.size(font_id, size, 72)
+    blf.size(font_id, round(size * ui_scale), 72)
     blf.draw(font_id, text)
 
 
@@ -460,12 +461,14 @@ def bvhtree_from_object(object):
     import bmesh
     bm = bmesh.new()
 
-    mesh = object.to_mesh(bpy.context.depsgraph, True)
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    object_eval = object.evaluated_get(depsgraph)
+    mesh = object_eval.to_mesh()
     bm.from_mesh(mesh)
     bm.transform(object.matrix_world)
 
     bvhtree = BVHTree.FromBMesh(bm)
-    bpy.data.meshes.remove(mesh)
+    object_eval.to_mesh_clear()
     return bvhtree
 
 def shoot_region_2d_ray(bvhtree, position_2d):

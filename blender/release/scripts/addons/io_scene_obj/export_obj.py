@@ -74,7 +74,7 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
 
             if mat_wrap:
                 use_mirror = mat_wrap.metallic != 0.0
-                use_transparency = mat_wrap.transmission != 0.0
+                use_transparency = mat_wrap.alpha != 1.0
 
                 # XXX Totally empirical conversion, trying to adapt it
                 #     (from 1.0 - 0.0 Principled BSDF range to 0.0 - 900.0 OBJ specular exponent range)...
@@ -91,10 +91,9 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
                 # XXX TODO Find a way to handle tint and diffuse color, in a consistent way with import...
                 fw('Ks %.6f %.6f %.6f\n' % (mat_wrap.specular, mat_wrap.specular, mat_wrap.specular))  # Specular
                 # Emission, not in original MTL standard but seems pretty common, see T45766.
-                # XXX Not supported by current Principled-based shader.
-                fw('Ke 0.0 0.0 0.0\n')
+                fw('Ke %.6f %.6f %.6f\n' % mat_wrap.emission_color[:3])
                 fw('Ni %.6f\n' % mat_wrap.ior)  # Refraction index
-                fw('d %.6f\n' % (1.0 - mat_wrap.transmission))  # Alpha (obj uses 'd' for dissolve)
+                fw('d %.6f\n' % mat_wrap.alpha)  # Alpha (obj uses 'd' for dissolve)
 
                 # See http://en.wikipedia.org/wiki/Wavefront_.obj_file for whole list of values...
                 # Note that mapping is rather fuzzy sometimes, trying to do our best here.
@@ -116,12 +115,12 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
                         "map_Ka": None,  # ambient...
                         "map_Ks": "specular_texture",
                         "map_Ns": "roughness_texture",
-                        "map_d": "transmission_texture",
+                        "map_d": "alpha_texture",
                         "map_Tr": None,  # transmission roughness?
                         "map_Bump": "normalmap_texture",
                         "disp": None,  # displacement...
                         "refl": "metallic_texture",
-                        "map_Ke": None  # emission...
+                        "map_Ke": "emission_color_texture",
                         }
 
                 for key, mat_wrap_key in sorted(image_map.items()):
@@ -347,8 +346,10 @@ def write_file(filepath, objects, depsgraph, scene,
                             continue
                         # END NURBS
 
+                        ob_for_convert = ob.evaluated_get(depsgraph) if EXPORT_APPLY_MODIFIERS else ob.original
+
                         try:
-                            me = ob.to_mesh(depsgraph, EXPORT_APPLY_MODIFIERS)
+                            me = ob_for_convert.to_mesh()
                         except RuntimeError:
                             me = None
 
@@ -384,7 +385,7 @@ def write_file(filepath, objects, depsgraph, scene,
 
                         if not (len(face_index_pairs) + len(edges) + len(me.vertices)):  # Make sure there is something to write
                             # clean up
-                            bpy.data.meshes.remove(me)
+                            ob_for_convert.to_mesh_clear()
                             continue  # dont bother with this mesh.
 
                         if EXPORT_NORMALS and face_index_pairs:
@@ -637,7 +638,7 @@ def write_file(filepath, objects, depsgraph, scene,
                         totno += no_unique_count
 
                         # clean up
-                        bpy.data.meshes.remove(me)
+                        ob_for_convert.to_mesh_clear()
 
                 subprogress1.leave_substeps("Finished writing geometry of '%s'." % ob_main.name)
             subprogress1.leave_substeps()
@@ -678,7 +679,7 @@ def _write(context, filepath,
         base_name, ext = os.path.splitext(filepath)
         context_name = [base_name, '', '', ext]  # Base name, scene name, frame number, extension
 
-        depsgraph = context.depsgraph
+        depsgraph = context.evaluated_depsgraph_get()
         scene = context.scene
 
         # Exit edit mode before exporting, so current object states are exported properly.

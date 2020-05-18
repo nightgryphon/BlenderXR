@@ -17,7 +17,8 @@
  * All rights reserved.
  */
 
-/** \file \ingroup gpu
+/** \file
+ * \ingroup gpu
  *
  * GPU vertex format
  */
@@ -26,6 +27,7 @@
 #define __GPU_VERTEX_FORMAT_PRIVATE_H__
 
 void VertexFormat_pack(GPUVertFormat *format);
+void VertexFormat_deinterleave(GPUVertFormat *format, uint vertex_len);
 uint padding(uint offset, uint alignment);
 uint vertex_buffer_size(const GPUVertFormat *format, uint vertex_len);
 

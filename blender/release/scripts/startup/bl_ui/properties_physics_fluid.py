@@ -23,10 +23,10 @@ from bpy.types import (
     Panel,
 )
 from bpy.app.translations import pgettext_iface as iface_
-from bl_operators.presets import PresetMenu
+from bl_ui.utils import PresetPanel
 
 
-class FLUID_PT_presets(PresetMenu):
+class FLUID_PT_presets(PresetPanel, Panel):
     bl_label = "Fluid Presets"
     preset_subdir = "fluid"
     preset_operator = "script.execute_preset"
@@ -38,6 +38,7 @@ class PhysicButtonsPanel:
     bl_region_type = 'WINDOW'
     bl_context = "physics"
 
+    @staticmethod
     def poll_fluid(context):
         ob = context.object
         if not ((ob and ob.type == 'MESH') and (context.fluid)):
@@ -45,6 +46,7 @@ class PhysicButtonsPanel:
 
         return (bpy.app.build_options.mod_fluid)
 
+    @staticmethod
     def poll_fluid_settings(context):
         if not (PhysicButtonsPanel.poll_fluid(context)):
             return False
@@ -52,6 +54,7 @@ class PhysicButtonsPanel:
         md = context.fluid
         return md and md.settings and (md.settings.type != 'NONE')
 
+    @staticmethod
     def poll_fluid_domain(context):
         if not PhysicButtonsPanel.poll_fluid(context):
             return False
@@ -62,7 +65,7 @@ class PhysicButtonsPanel:
 
 class PHYSICS_PT_fluid(PhysicButtonsPanel, Panel):
     bl_label = "Fluid"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -89,7 +92,7 @@ class PHYSICS_PT_fluid(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_fluid_flow(PhysicButtonsPanel, Panel):
     bl_label = "Flow"
     bl_parent_id = "PHYSICS_PT_fluid"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -161,7 +164,7 @@ class PHYSICS_PT_fluid_flow(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_fluid_settings(PhysicButtonsPanel, Panel):
     bl_label = "Settings"
     bl_parent_id = "PHYSICS_PT_fluid"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -250,7 +253,7 @@ class PHYSICS_PT_fluid_settings(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_fluid_particle_cache(PhysicButtonsPanel, Panel):
     bl_label = "Cache"
     bl_parent_id = "PHYSICS_PT_fluid"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -273,7 +276,7 @@ class PHYSICS_PT_domain_bake(PhysicButtonsPanel, Panel):
     bl_label = "Bake"
     bl_parent_id = 'PHYSICS_PT_fluid'
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -305,7 +308,7 @@ class PHYSICS_PT_domain_gravity(PhysicButtonsPanel, Panel):
     bl_label = "World"
     bl_parent_id = 'PHYSICS_PT_fluid'
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -358,7 +361,7 @@ class PHYSICS_PT_domain_viscosity(PhysicButtonsPanel, Panel):
     bl_label = "Viscosity"
     bl_parent_id = 'PHYSICS_PT_fluid'
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -367,7 +370,7 @@ class PHYSICS_PT_domain_viscosity(PhysicButtonsPanel, Panel):
 
         return (context.engine in cls.COMPAT_ENGINES)
 
-    def draw_header_preset(self, context):
+    def draw_header_preset(self, _context):
         FLUID_PT_presets.draw_panel_header(self.layout)
 
     def draw(self, context):
@@ -388,7 +391,7 @@ class PHYSICS_PT_domain_boundary(PhysicButtonsPanel, Panel):
     bl_label = "Boundary"
     bl_parent_id = 'PHYSICS_PT_fluid'
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):
@@ -422,7 +425,7 @@ class PHYSICS_PT_domain_particles(PhysicButtonsPanel, Panel):
     bl_label = "Particles"
     bl_parent_id = 'PHYSICS_PT_fluid'
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
 
     @classmethod
     def poll(cls, context):

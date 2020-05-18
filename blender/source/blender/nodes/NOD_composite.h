@@ -17,7 +17,8 @@
  * All rights reserved.
  */
 
-/** \file \ingroup nodes
+/** \file
+ * \ingroup nodes
  */
 
 #ifndef __NOD_COMPOSITE_H__
@@ -26,7 +27,6 @@
 #include "BKE_node.h"
 
 extern struct bNodeTreeType *ntreeType_Composite;
-
 
 /* ****************** types array for all composite nodes ****************** */
 
@@ -74,6 +74,7 @@ void register_node_type_cmp_dilateerode(void);
 void register_node_type_cmp_inpaint(void);
 void register_node_type_cmp_despeckle(void);
 void register_node_type_cmp_defocus(void);
+void register_node_type_cmp_denoise(void);
 
 void register_node_type_cmp_valtorgb(void);
 void register_node_type_cmp_rgbtobw(void);
@@ -132,7 +133,14 @@ void register_node_type_cmp_planetrackdeform(void);
 void register_node_type_cmp_cornerpin(void);
 
 void node_cmp_rlayers_outputs(struct bNodeTree *ntree, struct bNode *node);
-void node_cmp_rlayers_register_pass(struct bNodeTree *ntree, struct bNode *node, struct Scene *scene, struct ViewLayer *view_layer, const char *name, int type);
+void node_cmp_rlayers_register_pass(struct bNodeTree *ntree,
+                                    struct bNode *node,
+                                    struct Scene *scene,
+                                    struct ViewLayer *view_layer,
+                                    const char *name,
+                                    int type);
 const char *node_cmp_rlayers_sock_to_pass(int sock_index);
+
+void register_node_type_cmp_custom_group(bNodeType *ntype);
 
 #endif

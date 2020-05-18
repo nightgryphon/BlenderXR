@@ -17,7 +17,8 @@
  * All rights reserved.
  */
 
-/** \file \ingroup edmesh
+/** \file
+ * \ingroup edmesh
  */
 
 /* Internal for editmesh_xxxx.c functions */
@@ -53,9 +54,12 @@ struct wmOperatorType;
 
 /* Calls a bmesh op, reporting errors to the user, etc */
 bool EDBM_op_callf(struct BMEditMesh *em, struct wmOperator *op, const char *fmt, ...);
-bool EDBM_op_call_and_selectf(struct BMEditMesh *em, struct wmOperator *op,
-                              const char *select_slot, const bool select_replace,
-                              const char *fmt, ...);
+bool EDBM_op_call_and_selectf(struct BMEditMesh *em,
+                              struct wmOperator *op,
+                              const char *select_slot,
+                              const bool select_replace,
+                              const char *fmt,
+                              ...);
 /* Same as above, but doesn't report errors.*/
 bool EDBM_op_call_silentf(struct BMEditMesh *em, const char *fmt, ...);
 
@@ -64,21 +68,29 @@ bool EDBM_op_call_silentf(struct BMEditMesh *em, const char *fmt, ...);
  * it.
  *
  * execute the operator with BM_Exec_Op */
-bool EDBM_op_init(struct BMEditMesh *em, struct BMOperator *bmop,
-                  struct wmOperator *op, const char *fmt, ...);
+bool EDBM_op_init(
+    struct BMEditMesh *em, struct BMOperator *bmop, struct wmOperator *op, const char *fmt, ...);
 /* Cleans up after a bmesh operator */
-bool EDBM_op_finish(struct BMEditMesh *em, struct BMOperator *bmop,
-                    struct wmOperator *op, const bool do_report);
+bool EDBM_op_finish(struct BMEditMesh *em,
+                    struct BMOperator *bmop,
+                    struct wmOperator *op,
+                    const bool do_report);
 
 void EDBM_stats_update(struct BMEditMesh *em);
 
 bool EDBM_view3d_poll(struct bContext *C);
 
-struct BMElem *EDBM_elem_from_selectmode(
-        struct BMEditMesh *em,
-        struct BMVert *eve, struct BMEdge *eed, struct BMFace *efa);
-int            EDBM_elem_to_index_any(struct BMEditMesh *em, struct BMElem *ele);
+struct BMElem *EDBM_elem_from_selectmode(struct BMEditMesh *em,
+                                         struct BMVert *eve,
+                                         struct BMEdge *eed,
+                                         struct BMFace *efa);
+int EDBM_elem_to_index_any(struct BMEditMesh *em, struct BMElem *ele);
 struct BMElem *EDBM_elem_from_index_any(struct BMEditMesh *em, int index);
+
+bool edbm_extrude_edges_indiv(struct BMEditMesh *em,
+                              struct wmOperator *op,
+                              const char hflag,
+                              const bool use_normal_flip);
 
 /* *** editmesh_add.c *** */
 void MESH_OT_primitive_plane_add(struct wmOperatorType *ot);
@@ -96,6 +108,7 @@ void MESH_OT_primitive_cube_add_gizmo(struct wmOperatorType *ot);
 
 /* *** editmesh_bevel.c *** */
 void MESH_OT_bevel(struct wmOperatorType *ot);
+struct wmKeyMap *bevel_modal_keymap(struct wmKeyConfig *keyconf);
 
 /* *** editmesh_bisect.c *** */
 void MESH_OT_bisect(struct wmOperatorType *ot);
@@ -122,6 +135,8 @@ void MESH_GGT_spin_redo(struct wmGizmoGroupType *gzgt);
 void MESH_OT_polybuild_face_at_cursor(struct wmOperatorType *ot);
 void MESH_OT_polybuild_split_at_cursor(struct wmOperatorType *ot);
 void MESH_OT_polybuild_dissolve_at_cursor(struct wmOperatorType *ot);
+void MESH_OT_polybuild_transform_at_cursor(struct wmOperatorType *ot);
+void MESH_OT_polybuild_delete_at_cursor(struct wmOperatorType *ot);
 
 /* *** editmesh_inset.c *** */
 void MESH_OT_inset(struct wmOperatorType *ot);
@@ -131,24 +146,19 @@ void MESH_OT_intersect(struct wmOperatorType *ot);
 void MESH_OT_intersect_boolean(struct wmOperatorType *ot);
 void MESH_OT_face_split_by_edges(struct wmOperatorType *ot);
 
-
 /* *** editmesh_knife.c *** */
 void MESH_OT_knife_tool(struct wmOperatorType *ot);
 void MESH_OT_knife_project(struct wmOperatorType *ot);
-void EDBM_mesh_knife(struct bContext *C, struct LinkNode *polys,
-                     bool use_tag, bool cut_through);
+void EDBM_mesh_knife(struct bContext *C, struct LinkNode *polys, bool use_tag, bool cut_through);
 
 struct wmKeyMap *knifetool_modal_keymap(struct wmKeyConfig *keyconf);
-
 
 /* *** editmesh_loopcut.c *** */
 void MESH_OT_loopcut(struct wmOperatorType *ot);
 
-
 /* *** editmesh_rip.c *** */
 void MESH_OT_rip(struct wmOperatorType *ot);
 void MESH_OT_rip_edge(struct wmOperatorType *ot);
-
 
 /* *** editmesh_select.c *** */
 void MESH_OT_select_similar(struct wmOperatorType *ot);
@@ -179,7 +189,6 @@ void MESH_OT_loop_to_region(struct wmOperatorType *ot);
 void MESH_OT_shortest_path_select(struct wmOperatorType *ot);
 
 extern struct EnumPropertyItem *corner_type_items;
-
 
 /* *** editmesh_tools.c *** */
 void MESH_OT_subdivide(struct wmOperatorType *ot);
@@ -250,6 +259,9 @@ void MESH_OT_average_normals(struct wmOperatorType *ot);
 void MESH_OT_smoothen_normals(struct wmOperatorType *ot);
 void MESH_OT_mod_weighted_strength(struct wmOperatorType *ot);
 
+/* *** editmesh_mask_extract.c *** */
+void MESH_OT_paint_mask_extract(struct wmOperatorType *ot);
+
 struct wmKeyMap *point_normals_modal_keymap(wmKeyConfig *keyconf);
 
 #ifdef WITH_FREESTYLE
@@ -275,4 +287,4 @@ void MESH_OT_customdata_custom_splitnormals_clear(struct wmOperatorType *ot);
 #endif
 #endif
 
-#endif  /* __MESH_INTERN_H__ */
+#endif /* __MESH_INTERN_H__ */

@@ -1,4 +1,4 @@
-# Copyright 2018 The glTF-Blender-IO authors.
+# Copyright 2018-2019 The glTF-Blender-IO authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 import bpy
 from .gltf2_blender_texture import BlenderTextureInfo
 from ..com.gltf2_blender_material_helpers import get_preoutput_node_output
+from ..com.gltf2_blender_conversion import texture_transform_gltf_to_blender
 
 
 class BlenderEmissiveMap():
@@ -37,7 +38,7 @@ class BlenderEmissiveMap():
         node_tree = material.node_tree
 
         if factor_only is False:
-            BlenderTextureInfo.create(gltf, pymaterial.emissive_texture.index)
+            BlenderTextureInfo.create(gltf, pymaterial.emissive_texture)
 
         # check if there is some emissive_factor on material
         if pymaterial.emissive_factor is None:
@@ -82,6 +83,14 @@ class BlenderEmissiveMap():
                 ].blender_image_name]
             text.label = 'EMISSIVE'
             text.location = -1000, 1000
+            if text.image is not None: # Sometimes images can't be retrieved (bad gltf file ...)
+                tex_transform = text.image['tex_transform'][str(pymaterial.emissive_texture.index)]
+                mapping.inputs['Location'].default_value[0] = texture_transform_gltf_to_blender(tex_transform)['offset'][0]
+                mapping.inputs['Location'].default_value[1] = texture_transform_gltf_to_blender(tex_transform)['offset'][1]
+                mapping.inputs['Rotation'].default_value[2] = texture_transform_gltf_to_blender(tex_transform)['rotation']
+                mapping.inputs['Scale'].default_value[0] = texture_transform_gltf_to_blender(tex_transform)['scale'][0]
+                mapping.inputs['Scale'].default_value[1] = texture_transform_gltf_to_blender(tex_transform)['scale'][1]
+
 
             # create links
             node_tree.links.new(mapping.inputs[0], uvmap.outputs[0])

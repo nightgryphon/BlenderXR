@@ -20,8 +20,8 @@
 
 __author__ = "Nutti <nutti.metro@gmail.com>"
 __status__ = "production"
-__version__ = "6.0"
-__date__ = "26 Jan 2019"
+__version__ = "6.2"
+__date__ = "31 Jul 2019"
 
 import bpy
 from bpy.props import (
@@ -33,7 +33,7 @@ from bpy.props import (
 from bpy.types import AddonPreferences
 
 from . import common
-from .op.flip_rotate_uv import MUV_OT_FlipRotate
+from .op.flip_rotate_uv import MUV_OT_FlipRotateUV
 from .op.mirror_uv import MUV_OT_MirrorUV
 from .op.move_uv import MUV_OT_MoveUV
 from .op.unwrap_constraint import MUV_OT_UnwrapConstraint
@@ -58,7 +58,7 @@ from .ui.IMAGE_MT_uvs import (
     MUV_MT_UVInspection,
 )
 from .utils.bl_class_registry import BlClassRegistry
-from .utils.addon_updator import AddonUpdatorManager
+from .utils.addon_updater import AddonUpdaterManager
 from .utils import compatibility as compat
 from . import updater
 
@@ -77,7 +77,7 @@ def view3d_uvmap_menu_fn(self, context):
     layout.separator()
     layout.label(text="UV Manipulation", icon=compat.icon('IMAGE'))
     # Flip/Rotate UV
-    ops = layout.operator(MUV_OT_FlipRotate.bl_idname, text="Flip/Rotate UV")
+    ops = layout.operator(MUV_OT_FlipRotateUV.bl_idname, text="Flip/Rotate UV")
     ops.seams = sc.muv_flip_rotate_uv_seams
     # Mirror UV
     ops = layout.operator(MUV_OT_MirrorUV.bl_idname, text="Mirror UV")
@@ -160,12 +160,12 @@ def add_builtin_menu():
 
 def remove_builtin_menu():
     bpy.types.IMAGE_MT_uvs.remove(image_uvs_menu_fn)
-    bpy.types.VIEW3D_MT_object.append(view3d_object_menu_fn)
+    bpy.types.VIEW3D_MT_object.remove(view3d_object_menu_fn)
     bpy.types.VIEW3D_MT_uv_map.remove(view3d_uvmap_menu_fn)
 
 
 def get_update_candidate_branches(_, __):
-    manager = AddonUpdatorManager.get_instance()
+    manager = AddonUpdaterManager.get_instance()
     if not manager.candidate_checked():
         return []
 
@@ -187,7 +187,7 @@ def get_debug_mode(self):
 
 @BlClassRegistry()
 @compat.make_annotations
-class Preferences(AddonPreferences):
+class MUV_Preferences(AddonPreferences):
     """Preferences class: Preferences for this add-on"""
 
     bl_idname = "magic_uv"

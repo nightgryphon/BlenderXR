@@ -17,7 +17,8 @@
  * All rights reserved.
  */
 
-/** \file \ingroup edobj
+/** \file
+ * \ingroup edobj
  */
 
 #ifndef __OBJECT_INTERN_H__
@@ -33,9 +34,9 @@ struct ModifierData;
 
 /* add hook menu */
 enum eObject_Hook_Add_Mode {
-	OBJECT_ADDHOOK_NEWOB = 1,
-	OBJECT_ADDHOOK_SELOB,
-	OBJECT_ADDHOOK_SELOB_BONE,
+  OBJECT_ADDHOOK_NEWOB = 1,
+  OBJECT_ADDHOOK_SELOB,
+  OBJECT_ADDHOOK_SELOB_BONE,
 };
 
 /* internal exports only */
@@ -58,7 +59,7 @@ void OBJECT_OT_vertex_parent_set(struct wmOperatorType *ot);
 void OBJECT_OT_track_set(struct wmOperatorType *ot);
 void OBJECT_OT_track_clear(struct wmOperatorType *ot);
 void OBJECT_OT_make_local(struct wmOperatorType *ot);
-void OBJECT_OT_make_override_static(struct wmOperatorType *ot);
+void OBJECT_OT_make_override_library(struct wmOperatorType *ot);
 void OBJECT_OT_make_single_user(struct wmOperatorType *ot);
 void OBJECT_OT_make_links_scene(struct wmOperatorType *ot);
 void OBJECT_OT_make_links_data(struct wmOperatorType *ot);
@@ -70,7 +71,7 @@ void OBJECT_OT_hide_view_set(struct wmOperatorType *ot);
 void OBJECT_OT_hide_view_clear(struct wmOperatorType *ot);
 void OBJECT_OT_hide_collection(struct wmOperatorType *ot);
 void OBJECT_OT_mode_set(struct wmOperatorType *ot);
-void OBJECT_OT_mode_set_or_submode(struct wmOperatorType *ot);
+void OBJECT_OT_mode_set_with_submode(struct wmOperatorType *ot);
 void OBJECT_OT_editmode_toggle(struct wmOperatorType *ot);
 void OBJECT_OT_posemode_toggle(struct wmOperatorType *ot);
 void OBJECT_OT_proxy_make(struct wmOperatorType *ot);
@@ -136,11 +137,16 @@ void COLLECTION_OT_objects_add_active(struct wmOperatorType *ot);
 void COLLECTION_OT_objects_remove_active(struct wmOperatorType *ot);
 
 /* object_modifier.c */
-bool edit_modifier_poll_generic(struct bContext *C, struct StructRNA *rna_type, int obtype_flag);
+bool edit_modifier_poll_generic(struct bContext *C,
+                                struct StructRNA *rna_type,
+                                int obtype_flag,
+                                const bool is_editmode_allowed);
 bool edit_modifier_poll(struct bContext *C);
 void edit_modifier_properties(struct wmOperatorType *ot);
 int edit_modifier_invoke_properties(struct bContext *C, struct wmOperator *op);
-struct ModifierData *edit_modifier_property_get(struct wmOperator *op, struct Object *ob, int type);
+struct ModifierData *edit_modifier_property_get(struct wmOperator *op,
+                                                struct Object *ob,
+                                                int type);
 
 void OBJECT_OT_modifier_add(struct wmOperatorType *ot);
 void OBJECT_OT_modifier_remove(struct wmOperatorType *ot);
@@ -272,6 +278,10 @@ void OBJECT_OT_bake(wmOperatorType *ot);
 
 /* object_random.c */
 void TRANSFORM_OT_vertex_random(struct wmOperatorType *ot);
+
+/* object_remesh.c */
+void OBJECT_OT_voxel_remesh(struct wmOperatorType *ot);
+void OBJECT_OT_quadriflow_remesh(struct wmOperatorType *ot);
 
 /* object_transfer_data.c */
 void OBJECT_OT_data_transfer(struct wmOperatorType *ot);

@@ -10,27 +10,15 @@ from math import (
 from bpy.props import (
         FloatProperty,
         IntProperty,
+        BoolProperty,
+        StringProperty,
+        FloatVectorProperty
         )
-
-
-# Create a new mesh (object) from verts/edges/faces.
-# verts/edges/faces ... List of vertices/edges/faces for the
-#                       new mesh (as used in from_pydata)
-# name ... Name of the new mesh (& object)
-
-def create_mesh_object(context, verts, edges, faces, name):
-    # Create new mesh
-    mesh = bpy.data.meshes.new(name)
-
-    # Make a mesh from a list of verts/edges/faces.
-    mesh.from_pydata(verts, edges, faces)
-
-    # Update mesh geometry after adding stuff.
-    mesh.update()
-
-    from bpy_extras import object_utils
-    return object_utils.object_data_add(context, mesh, operator=None)
-
+from mathutils import (
+        Vector,
+        Matrix,
+        )
+from bpy_extras import object_utils
 
 # A very simple "bridge" tool.
 # Connects two equally long vertex rows with faces.
@@ -135,7 +123,10 @@ def add_tooth(a, t, d, radius, Ad, De, base, p_angle, rack=0, crown=0.0):
 
     # Pressure angle calc
     O = Ad * tan(p_angle)
-    p_angle = atan(O / Ra)
+    if Ra != 0:
+        p_angle = atan(O / Ra)
+    else:
+        p_angle = atan(O)
 
     if radius < 0:
         p_angle = -p_angle
@@ -262,7 +253,10 @@ def add_gear(teethNum, radius, Ad, De, base, p_angle,
         teethNum = 1
 
     #print(radius, width, conangle)
-    scale = (radius - 2 * width * tan(conangle)) / radius
+    if radius != 0:
+        scale = (radius - 2 * width * tan(conangle)) / radius
+    else:
+        scale = radius - 2 * width * tan(conangle)
 
     verts = []
     faces = []
@@ -547,79 +541,114 @@ def add_worm(teethNum, rowNum, radius, Ad, De, p_angle,
 
     return verts, faces, vgroup_top, vgroup_valley
 
+def AddGearMesh(self, context):
+    
+    verts, faces, verts_tip, verts_valley = add_gear(
+            self.number_of_teeth,
+            self.radius,
+            self.addendum,
+            self.dedendum,
+            self.base,
+            self.angle,
+            width=self.width,
+            skew=self.skew,
+            conangle=self.conangle,
+            crown=self.crown
+            )
+            
+    mesh = bpy.data.meshes.new("Gear")
+    mesh.from_pydata(verts, [], faces)
+    
+    return mesh, verts_tip, verts_valley
+
 
 class AddGear(Operator):
     bl_idname = "mesh.primitive_gear"
     bl_label = "Add Gear"
     bl_description = "Construct a gear mesh"
     bl_options = {'REGISTER', 'UNDO', 'PRESET'}
+    
+    # align_matrix for the invoke
+    align_matrix : Matrix()
+
+    Gear : BoolProperty(name = "Gear",
+                default = True,
+                description = "Gear")
+
+    #### change properties
+    name : StringProperty(name = "Name",
+                    description = "Name")
+
+    change : BoolProperty(name = "Change",
+                default = False,
+                description = "change Gear")
 
     number_of_teeth: IntProperty(name="Number of Teeth",
             description="Number of teeth on the gear",
             min=2,
-            max=265,
+            soft_max=1000,
             default=12
             )
     radius: FloatProperty(name="Radius",
             description="Radius of the gear, negative for crown gear",
-            min=-100.0,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=1.0
             )
     addendum: FloatProperty(name="Addendum",
             description="Addendum, extent of tooth above radius",
-            min=0.01,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.1
             )
     dedendum: FloatProperty(name="Dedendum",
             description="Dedendum, extent of tooth below radius",
-            min=0.0,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.1
             )
     angle: FloatProperty(name="Pressure Angle",
             description="Pressure angle, skewness of tooth tip",
-            min=0.0,
-            max=radians(45.0),
+            soft_min=radians(-45.0),
+            soft_max=radians(45.0),
             unit='ROTATION',
             default=radians(20.0)
             )
     base: FloatProperty(name="Base",
             description="Base, extent of gear below radius",
-            min=0.0,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.2
             )
     width: FloatProperty(name="Width",
             description="Width, thickness of gear",
-            min=0.05,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.2
             )
     skew: FloatProperty(name="Skewness",
             description="Skew of teeth",
-            min=radians(-90.0),
-            max=radians(90.0),
+            soft_min=radians(-360.0),
+            soft_max=radians(360.0),
             unit='ROTATION',
             default=radians(0.0)
             )
     conangle: FloatProperty(name="Conical angle",
             description="Conical angle of gear",
-            min=0.0,
-            max=radians(90.0),
+            soft_min=radians(-360.0),
+            soft_max=radians(360.0),
             unit='ROTATION',
             default=radians(0.0)
             )
     crown: FloatProperty(name="Crown",
             description="Inward pointing extend of crown teeth",
-            min=0.0,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.0
             )
@@ -646,32 +675,98 @@ class AddGear(Operator):
         box.prop(self, 'crown')
 
     def execute(self, context):
-        verts, faces, verts_tip, verts_valley = add_gear(
-            self.number_of_teeth,
-            self.radius,
-            self.addendum,
-            self.dedendum,
-            self.base,
-            self.angle,
-            width=self.width,
-            skew=self.skew,
-            conangle=self.conangle,
-            crown=self.crown
-            )
-
-        # Actually create the mesh object from this geometry data.
-        obj = create_mesh_object(context, verts, [], faces, "Gear")
-
-        # XXX, supporting adding in editmode is move involved
-        if obj.mode != 'EDIT':
+        
+        if bpy.context.mode == "OBJECT":
+            if self.change == True and self.change != None:
+                obj = context.active_object
+                if 'Gear' in obj.data.keys():
+                    oldmesh = obj.data
+                    oldmeshname = obj.data.name
+                    mesh, verts_tip, verts_valley = AddGearMesh(self, context)
+                    obj.data = mesh
+                    try:
+                        bpy.ops.object.vertex_group_remove(all=True)
+                    except:
+                        pass
+                    
+                    for material in oldmesh.materials:
+                        obj.data.materials.append(material)
+                    
+                    bpy.data.meshes.remove(oldmesh)
+                    obj.data.name = oldmeshname
+                else:
+                    mesh, verts_tip, verts_valley = AddGearMesh(self, context)
+                    obj = object_utils.object_data_add(context, mesh, operator=None)
+            else:
+                mesh, verts_tip, verts_valley = AddGearMesh(self, context)
+                obj = object_utils.object_data_add(context, mesh, operator=None)
+    
             # Create vertex groups from stored vertices.
             tipGroup = obj.vertex_groups.new(name='Tips')
             tipGroup.add(verts_tip, 1.0, 'ADD')
-
+    
             valleyGroup = obj.vertex_groups.new(name='Valleys')
             valleyGroup.add(verts_valley, 1.0, 'ADD')
+    
+            obj.data["Gear"] = True
+            obj.data["change"] = False
+            for prm in GearParameters():
+                obj.data[prm] = getattr(self, prm)
 
+        if bpy.context.mode == "EDIT_MESH":
+            active_object = context.active_object
+            name_active_object = active_object.name
+            bpy.ops.object.mode_set(mode='OBJECT')
+            mesh, verts_tip, verts_valley = AddGearMesh(self, context)
+            obj = object_utils.object_data_add(context, mesh, operator=None)
+            
+            # Create vertex groups from stored vertices.
+            tipGroup = obj.vertex_groups.new(name='Tips')
+            tipGroup.add(verts_tip, 1.0, 'ADD')
+    
+            valleyGroup = obj.vertex_groups.new(name='Valleys')
+            valleyGroup.add(verts_valley, 1.0, 'ADD')
+            
+            obj.select_set(True)
+            active_object.select_set(True)
+            bpy.ops.object.join()
+            context.active_object.name = name_active_object
+            bpy.ops.object.mode_set(mode='EDIT')
         return {'FINISHED'}
+
+def GearParameters():
+    GearParameters = [
+        "number_of_teeth",
+        "radius",
+        "addendum",
+        "dedendum",
+        "base",
+        "angle",
+        "width",
+        "skew",
+        "conangle",
+        "crown",
+        ]
+    return GearParameters
+
+def AddWormGearMesh(self, context):
+
+    verts, faces, verts_tip, verts_valley = add_worm(
+            self.number_of_teeth,
+            self.number_of_rows,
+            self.radius,
+            self.addendum,
+            self.dedendum,
+            self.angle,
+            width=self.row_height,
+            skew=self.skew,
+            crown=self.crown
+            )
+    
+    mesh = bpy.data.meshes.new("Worm Gear")
+    mesh.from_pydata(verts, [], faces)
+    
+    return mesh, verts_tip, verts_valley
 
 
 class AddWormGear(Operator):
@@ -680,73 +775,85 @@ class AddWormGear(Operator):
     bl_description = "Construct a worm gear mesh"
     bl_options = {'REGISTER', 'UNDO', 'PRESET'}
 
+    WormGear : BoolProperty(name = "WormGear",
+                default = True,
+                description = "WormGear")
+
+    #### change properties
+    name : StringProperty(name = "Name",
+                    description = "Name")
+
+    change : BoolProperty(name = "Change",
+                default = False,
+                description = "change WormGear")
+
     number_of_teeth: IntProperty(
             name="Number of Teeth",
             description="Number of teeth on the gear",
-            min=2,
-            max=265,
+            min=1,
+            soft_max=1000,
             default=12
             )
     number_of_rows: IntProperty(
             name="Number of Rows",
             description="Number of rows on the worm gear",
-            min=2,
-            max=265,
+            min=0,
+            soft_max=1000,
             default=32
             )
     radius: FloatProperty(
             name="Radius",
             description="Radius of the gear, negative for crown gear",
-            min=-100.0,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=1.0
             )
     addendum: FloatProperty(
             name="Addendum",
             description="Addendum, extent of tooth above radius",
-            min=0.01,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.1
             )
     dedendum: FloatProperty(
             name="Dedendum",
             description="Dedendum, extent of tooth below radius",
-            min=0.0,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.1
             )
     angle: FloatProperty(
             name="Pressure Angle",
             description="Pressure angle, skewness of tooth tip",
-            min=0.0,
-            max=radians(45.0),
+            soft_min=radians(-45.0),
+            soft_max=radians(45.0),
             default=radians(20.0),
             unit='ROTATION'
             )
     row_height: FloatProperty(
             name="Row Height",
             description="Height of each Row",
-            min=0.05,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.2
             )
     skew: FloatProperty(
             name="Skewness per Row",
             description="Skew of each row",
-            min=radians(-90.0),
-            max=radians(90.0),
+            soft_min=radians(-360.0),
+            soft_max=radians(360.0),
             default=radians(11.25),
             unit='ROTATION'
             )
     crown: FloatProperty(
             name="Crown",
             description="Inward pointing extend of crown teeth",
-            min=0.0,
-            max=100.0,
+            soft_min=-1000.0,
+            soft_max=1000.0,
             unit='LENGTH',
             default=0.0
             )
@@ -770,28 +877,76 @@ class AddWormGear(Operator):
 
     def execute(self, context):
 
-        verts, faces, verts_tip, verts_valley = add_worm(
-            self.number_of_teeth,
-            self.number_of_rows,
-            self.radius,
-            self.addendum,
-            self.dedendum,
-            self.angle,
-            width=self.row_height,
-            skew=self.skew,
-            crown=self.crown
-            )
+        if bpy.context.mode == "OBJECT":
+            if self.change == True and self.change != None:
+                obj = context.active_object
+                if 'WormGear' in obj.data.keys():
+                    oldmesh = obj.data
+                    oldmeshname = obj.data.name
 
-        # Actually create the mesh object from this geometry data.
-        obj = create_mesh_object(context, verts, [], faces, "Worm Gear")
-
-        # XXX, supporting adding in editmode is move involved
-        if obj.mode != 'EDIT':
+                    mesh, verts_tip, verts_valley = AddWormGearMesh(self, context)
+                    obj.data = mesh
+                    try:
+                        bpy.ops.object.vertex_group_remove(all=True)
+                    except:
+                        pass
+                    
+                    for material in oldmesh.materials:
+                        obj.data.materials.append(material)
+                        
+                    bpy.data.meshes.remove(oldmesh)
+                    obj.data.name = oldmeshname
+                else:
+                    mesh, verts_tip, verts_valley = AddWormGearMesh(self, context)
+                    obj = object_utils.object_data_add(context, mesh, operator=None)
+            else:
+                mesh, verts_tip, verts_valley = AddWormGearMesh(self, context)
+                obj = object_utils.object_data_add(context, mesh, operator=None)
+    
             # Create vertex groups from stored vertices.
             tipGroup = obj.vertex_groups.new(name = 'Tips')
             tipGroup.add(verts_tip, 1.0, 'ADD')
-
+    
             valleyGroup = obj.vertex_groups.new(name = 'Valleys')
             valleyGroup.add(verts_valley, 1.0, 'ADD')
+            
+            obj.data["WormGear"] = True
+            obj.data["change"] = False
+            for prm in WormGearParameters():
+                obj.data[prm] = getattr(self, prm)
+
+        if bpy.context.mode == "EDIT_MESH":
+            active_object = context.active_object
+            name_active_object = active_object.name
+            bpy.ops.object.mode_set(mode='OBJECT')
+            mesh, verts_tip, verts_valley = AddWormGearMesh(self, context)
+            obj = object_utils.object_data_add(context, mesh, operator=None)
+            
+            # Create vertex groups from stored vertices.
+            tipGroup = obj.vertex_groups.new(name = 'Tips')
+            tipGroup.add(verts_tip, 1.0, 'ADD')
+    
+            valleyGroup = obj.vertex_groups.new(name = 'Valleys')
+            valleyGroup.add(verts_valley, 1.0, 'ADD')
+            
+            obj.select_set(True)
+            active_object.select_set(True)
+            bpy.ops.object.join()
+            context.active_object.name = name_active_object
+            bpy.ops.object.mode_set(mode='EDIT')
 
         return {'FINISHED'}
+
+def WormGearParameters():
+    WormGearParameters = [
+        "number_of_teeth",
+        "number_of_rows",
+        "radius",
+        "addendum",
+        "dedendum",
+        "angle",
+        "row_height",
+        "skew",
+        "crown",
+        ]
+    return WormGearParameters

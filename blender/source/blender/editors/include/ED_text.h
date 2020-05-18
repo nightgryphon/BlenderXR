@@ -17,7 +17,8 @@
  * All rights reserved.
  */
 
-/** \file \ingroup editors
+/** \file
+ * \ingroup editors
  */
 
 #ifndef __ED_TEXT_H__
@@ -25,14 +26,22 @@
 
 struct ARegion;
 struct SpaceText;
-struct TextUndoBuf;
+struct Text;
+struct UndoStep;
 struct UndoType;
+struct bContext;
 
-bool ED_text_region_location_from_cursor(struct SpaceText *st, struct ARegion *ar, const int cursor_co[2], int r_pixel_co[2]);
+bool ED_text_region_location_from_cursor(struct SpaceText *st,
+                                         struct ARegion *ar,
+                                         const int cursor_co[2],
+                                         int r_pixel_co[2]);
 
 /* text_undo.c */
 void ED_text_undosys_type(struct UndoType *ut);
 
-struct TextUndoBuf *ED_text_undo_push_init(struct bContext *C);
+struct UndoStep *ED_text_undo_push_init(struct bContext *C);
+
+/* text_format.c */
+bool ED_text_is_syntax_highlight_supported(struct Text *text);
 
 #endif /* __ED_TEXT_H__ */

@@ -96,6 +96,7 @@ def poly_line(curve, points, join=True, type='NURBS'):
 def poly_lines(objname, curvename, lines, bevel=None, joins=False, ctype='NURBS'):
     curve = bpy.data.curves.new(name=curvename, type='CURVE')
     curve.dimensions = '3D'
+    curve.fill_mode = 'FULL'
 
     obj = bpy.data.objects.new(objname, curve)
     obj.location = (0, 0, 0)  # object origin
@@ -203,6 +204,11 @@ class Braid(Operator):
             description="Switch between round and sharp corners",
             default=False
             )
+    edit_mode : BoolProperty(
+            name="Show in edit mode",
+            default=True,
+            description="Show in edit mode"
+            )
 
     def draw(self, context):
         layout = self.layout
@@ -226,8 +232,15 @@ class Braid(Operator):
         col.label(text="Geometry Options:")
         col.prop(self, "strandsize")
         col.prop(self, "resolution")
+        
+        col = layout.column()
+        col.row().prop(self, "edit_mode", expand=True)
 
     def execute(self, context):
+         # turn off 'Enter Edit Mode'
+        use_enter_edit_mode = bpy.context.preferences.edit.use_enter_edit_mode
+        bpy.context.preferences.edit.use_enter_edit_mode = False
+        
         circle = defaultCircle(self.strandsize)
         context.scene.collection.objects.link(circle)
         braid = awesome_braid(
@@ -243,8 +256,19 @@ class Braid(Operator):
 
         for ob in context.scene.objects:
             ob.select_set(False)
-        #base.select_set(True)
-        #context.scene.objects.active = braid
+        braid.select_set(True)
+        bpy.context.view_layer.objects.active = braid
+        
+        if use_enter_edit_mode:
+            bpy.ops.object.mode_set(mode = 'EDIT')
+        
+        # restore pre operator state
+        bpy.context.preferences.edit.use_enter_edit_mode = use_enter_edit_mode
+
+        if self.edit_mode:
+            bpy.ops.object.mode_set(mode = 'EDIT')
+        else:
+            bpy.ops.object.mode_set(mode = 'OBJECT')
 
         return {'FINISHED'}
 

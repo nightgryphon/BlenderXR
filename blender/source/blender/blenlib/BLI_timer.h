@@ -22,7 +22,8 @@
 
 #include "BLI_sys_types.h"
 
-/** \file \ingroup BLI
+/** \file
+ * \ingroup BLI
  */
 
 /* ret < 0: the timer will be removed.
@@ -32,13 +33,12 @@ typedef void (*BLI_timer_data_free)(uintptr_t uuid, void *user_data);
 
 /* `func(...) < 0`: The timer will be removed.
  * `func(...) >= 0`: The function will be called again in that many seconds. */
-void BLI_timer_register(
-        uintptr_t uuid,
-        BLI_timer_func func,
-        void *user_data,
-        BLI_timer_data_free user_data_free,
-        double first_interval,
-        bool persistent);
+void BLI_timer_register(uintptr_t uuid,
+                        BLI_timer_func func,
+                        void *user_data,
+                        BLI_timer_data_free user_data_free,
+                        double first_interval,
+                        bool persistent);
 
 bool BLI_timer_is_registered(uintptr_t uuid);
 
@@ -50,4 +50,8 @@ void BLI_timer_execute(void);
 
 void BLI_timer_free(void);
 
-#endif  /* __BLI_TIMER_H__ */
+/* This function is to be called next to BKE_CB_EVT_LOAD_PRE, to make sure the module
+ * is properly configured for the new file. */
+void BLI_timer_on_file_load(void);
+
+#endif /* __BLI_TIMER_H__ */

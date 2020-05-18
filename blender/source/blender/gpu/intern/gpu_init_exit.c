@@ -17,15 +17,15 @@
  * All rights reserved.
  */
 
-/** \file \ingroup gpu
+/** \file
+ * \ingroup gpu
  */
 
 #include "BLI_sys_types.h"
 #include "GPU_buffers.h"
-#include "GPU_init_exit.h"  /* interface */
+#include "GPU_init_exit.h" /* interface */
 #include "GPU_immediate.h"
 #include "GPU_batch.h"
-#include "GPU_texture.h"
 #include "BKE_global.h"
 
 #include "intern/gpu_codegen.h"
@@ -40,51 +40,55 @@ static bool initialized = false;
 
 void GPU_init(void)
 {
-	/* can't avoid calling this multiple times, see wm_window_ghostwindow_add */
-	if (initialized)
-		return;
+  /* can't avoid calling this multiple times, see wm_window_ghostwindow_add */
+  if (initialized) {
+    return;
+  }
 
-	initialized = true;
+  initialized = true;
+  gpu_platform_init();
+  gpu_extensions_init(); /* must come first */
 
-	gpu_extensions_init(); /* must come first */
+  gpu_codegen_init();
+  gpu_framebuffer_module_init();
 
-	gpu_codegen_init();
-	gpu_framebuffer_module_init();
+  if (G.debug & G_DEBUG_GPU) {
+    gpu_debug_init();
+  }
 
-	if (G.debug & G_DEBUG_GPU)
-		gpu_debug_init();
+  gpu_batch_init();
 
-	gpu_batch_init();
+  if (!G.background) {
+    immInit();
+  }
 
-	if (!G.background) {
-		immInit();
-	}
-
-	GPU_pbvh_fix_linking();
+  gpu_pbvh_init();
 }
-
 
 void GPU_exit(void)
 {
-	if (!G.background) {
-		immDestroy();
-	}
+  gpu_pbvh_exit();
 
-	gpu_batch_exit();
+  if (!G.background) {
+    immDestroy();
+  }
 
-	if (G.debug & G_DEBUG_GPU)
-		gpu_debug_exit();
+  gpu_batch_exit();
 
-	gpu_framebuffer_module_exit();
-	gpu_codegen_exit();
+  if (G.debug & G_DEBUG_GPU) {
+    gpu_debug_exit();
+  }
 
-	gpu_extensions_exit(); /* must come last */
+  gpu_framebuffer_module_exit();
+  gpu_codegen_exit();
 
-	initialized = false;
+  gpu_extensions_exit();
+  gpu_platform_exit(); /* must come last */
+
+  initialized = false;
 }
-
 
 bool GPU_is_initialized(void)
 {
-	return initialized;
+  return initialized;
 }

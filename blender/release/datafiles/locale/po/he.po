@@ -1,8 +1,9 @@
+
 msgid ""
 msgstr ""
-"Project-Id-Version: Blender 2.80 (sub 39) (b'6d89337257b6')\n"
+"Project-Id-Version: Blender 2.81 (sub 16) (b'99640d062234')\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2018-12-24 15:04:25\n"
+"POT-Creation-Date: 2019-11-20 13:23:12\n"
 "PO-Revision-Date: 2012-10-07 13:56+0300\n"
 "Last-Translator: Barak Itkin <lightningismyname@gmail.com>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -28,10 +29,6 @@ msgstr "ביתנ"
 
 msgid "Add"
 msgstr "ףסוה"
-
-
-msgid "Default"
-msgstr "לדחמ תרירב"
 
 
 msgid "Width"
@@ -62,8 +59,8 @@ msgid "Random"
 msgstr "יארקא"
 
 
-msgid "Both"
-msgstr "םהינש"
+msgid "Default"
+msgstr "לדחמ תרירב"
 
 
 msgid "Smooth"
@@ -170,6 +167,10 @@ msgid "Environment"
 msgstr "הביבס"
 
 
+msgid "Both"
+msgstr "םהינש"
+
+
 msgid "End"
 msgstr "ףוס"
 
@@ -234,10 +235,6 @@ msgid "Space"
 msgstr "חוור"
 
 
-msgid "Use Gradient"
-msgstr "לקשמ תעיבצ"
-
-
 msgid "Up"
 msgstr "הלעמ"
 
@@ -284,6 +281,11 @@ msgstr "םלוע"
 
 msgid "Mist"
 msgstr "לפרע"
+
+
+msgctxt "Operator"
+msgid "Add"
+msgstr "ףסוה"
 
 
 msgid "Python"
@@ -476,18 +478,8 @@ msgid "Move"
 msgstr "טרס"
 
 
-msgctxt "Operator"
-msgid "Copy To Selected"
-msgstr "רחבנל קתעה"
-
-
 msgid "Operation Mode"
 msgstr "תופקתשה"
-
-
-msgctxt "Operator"
-msgid "Copy Selection to Buffer"
-msgstr "רחבנל קתעה"
 
 
 msgctxt "Operator"
@@ -508,10 +500,6 @@ msgid "Detail Size"
 msgstr "טוריפ"
 
 
-msgid "Show Diffuse Color"
-msgstr "חתפמ עבצ"
-
-
 msgid "System"
 msgstr "תכרעמ"
 
@@ -520,8 +508,8 @@ msgid "Color Management"
 msgstr "עבצ לוהינ"
 
 
-msgid "GPU Mipmap Generation"
-msgstr "היוור"
+msgid "Text Style"
+msgstr "האבה הבכש"
 
 
 msgid "Tile Order"
@@ -572,21 +560,16 @@ msgid "Blender File"
 msgstr "Blender לש טנרטניאה רתא"
 
 
-msgid "Text Style"
-msgstr "האבה הבכש"
-
-
 msgid "Theme Background Color"
 msgstr "עקר"
 
 
+msgid "Use Gradient"
+msgstr "לקשמ תעיבצ"
+
+
 msgid "Default Layout"
 msgstr "לדחמ תרירב"
-
-
-msgctxt "Operator"
-msgid "Add"
-msgstr "ףסוה"
 
 
 msgid "Location:"
@@ -656,13 +639,18 @@ msgstr "Y ריצ"
 
 
 msgctxt "Operator"
-msgid "Movie"
-msgstr "טרס"
+msgid "Left"
+msgstr "לאמש"
 
 
 msgctxt "Operator"
-msgid "Right Handle"
-msgstr ":תינמי תידי"
+msgid "Right"
+msgstr "ןימי"
+
+
+msgctxt "Operator"
+msgid "Movie"
+msgstr "טרס"
 
 
 msgctxt "Operator"
@@ -685,12 +673,9 @@ msgid "Alpha Under"
 msgstr "רמה"
 
 
-msgid "Path:"
-msgstr ":ביתנ"
-
-
-msgid "Color Space:"
-msgstr ":עבצ בחרמ"
+msgctxt "Operator"
+msgid "Blender Website"
+msgstr "Blender לש טנרטניאה רתא"
 
 
 msgctxt "Operator"
@@ -698,28 +683,8 @@ msgid "Manual"
 msgstr "ינדי"
 
 
-msgctxt "Operator"
-msgid "Blender Website"
-msgstr "Blender לש טנרטניאה רתא"
-
-
 msgid "Preferences:"
 msgstr "Blender שמתשמ תופדעה"
-
-
-msgctxt "Operator"
-msgid "Shrink Fatten"
-msgstr "ץווכ"
-
-
-msgctxt "Operator"
-msgid "Right"
-msgstr "ןימי"
-
-
-msgctxt "Operator"
-msgid "Left"
-msgstr "לאמש"
 
 
 msgctxt "Operator"
@@ -740,6 +705,11 @@ msgstr "בוביס"
 msgctxt "Operator"
 msgid "Make"
 msgstr "הכסמ"
+
+
+msgctxt "Operator"
+msgid "Shrink Fatten"
+msgstr "ץווכ"
 
 
 msgctxt "Operator"
@@ -783,14 +753,6 @@ msgid "Coefficient of x"
 msgstr "x לש םדקמה"
 
 
-msgid "No active keying set"
-msgstr "הליעפ הבכש עבק"
-
-
-msgid "No active keying set to remove"
-msgstr "הליעפ הבכש עבק"
-
-
 msgid "No joints selected"
 msgstr "רבד רחבנ אל"
 
@@ -804,13 +766,13 @@ msgstr "השדח הצובק"
 
 
 msgctxt "Operator"
-msgid "Reset All to Default Values"
-msgstr "לדחמה תרירב יכרעל לכה לחתא"
+msgid "Change Shortcut"
+msgstr "ךרד־רוציק הנש"
 
 
 msgctxt "Operator"
-msgid "Change Shortcut"
-msgstr "ךרד־רוציק הנש"
+msgid "Reset All to Default Values"
+msgstr "לדחמה תרירב יכרעל לכה לחתא"
 
 
 msgctxt "Operator"
@@ -914,12 +876,12 @@ msgid "Height:"
 msgstr ":לקשמ"
 
 
-msgid "Cancel"
-msgstr "לוטיב"
-
-
 msgid "File path"
 msgstr "ץבוק ביתנ"
+
+
+msgid "Cancel"
+msgstr "לוטיב"
 
 
 msgid "File name"
@@ -942,6 +904,10 @@ msgid "Right Handle:"
 msgstr ":תינמי תידי"
 
 
+msgid "Add Modifier"
+msgstr "הנשמ ףסוה"
+
+
 msgid "ERROR: Invalid Python expression"
 msgstr "ןיקת אל Python יוטיב :האיגש"
 
@@ -950,20 +916,16 @@ msgid "ERROR: Invalid target channel(s)"
 msgstr "םיניקת אל הרטמ יצורע :האיגש"
 
 
-msgid "Add Modifier"
-msgstr "הנשמ ףסוה"
-
-
 msgid "View Properties"
 msgstr "הגוצת ינייפאמ"
 
 
-msgid " + Z"
-msgstr " + Z"
-
-
 msgid "Select Layer"
 msgstr "הבכש רחב"
+
+
+msgid " + Z"
+msgstr " + Z"
 
 
 msgid "Saved %s"
@@ -976,6 +938,14 @@ msgstr "תיוות לדוג"
 
 msgid "Squash"
 msgstr "ךעמ"
+
+
+msgid "Color Space:"
+msgstr ":עבצ בחרמ"
+
+
+msgid "Path:"
+msgstr ":ביתנ"
 
 
 msgid "Add Input"

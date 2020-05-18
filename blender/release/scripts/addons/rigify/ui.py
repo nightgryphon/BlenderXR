@@ -28,16 +28,36 @@ from bpy.props import (
 
 from mathutils import Color
 
-from .utils import get_rig_type, MetarigError
-from .utils import write_metarig, write_widget
-from .utils import unique_name
-from .utils import upgradeMetarigTypes, outdated_types
-from .utils import get_keyed_frames, bones_in_frame
-from .utils import overwrite_prop_animation
+from .utils.errors import MetarigError
+from .utils.rig import write_metarig
+from .utils.widgets import write_widget
+from .utils.naming import unique_name
+from .utils.rig import upgradeMetarigTypes, outdated_types
+
 from .rigs.utils import get_limb_generated_names
+
+from .utils.animation import get_keyed_frames_in_range, bones_in_frame, overwrite_prop_animation
+from .utils.animation import RIGIFY_OT_get_frame_range
+
+from .utils.animation import register as animation_register
+from .utils.animation import unregister as animation_unregister
+
+from . import base_rig
 from . import rig_lists
 from . import generate
 from . import rot_mode
+from . import feature_set_list
+
+
+def build_type_list(context, rigify_types):
+    rigify_types.clear()
+
+    for r in sorted(rig_lists.rigs):
+        if (context.object.data.active_feature_set in ('all', rig_lists.rigs[r]['feature_set'])
+                or len(feature_set_list.feature_set_items(context.scene, context)) == 2
+                ):
+            a = rigify_types.add()
+            a.name = r
 
 
 class DATA_PT_rigify_buttons(bpy.types.Panel):
@@ -65,21 +85,18 @@ class DATA_PT_rigify_buttons(bpy.types.Panel):
 
             check_props = ['IK_follow', 'root/parent', 'FK_limb_follow', 'IK_Stretch']
 
-            for obj in bpy.data.objects:
-                if type(obj.data) != bpy.types.Armature:
-                    continue
-                for bone in obj.pose.bones:
-                    if bone.bone.layers[30] and (list(set(bone.keys()) & set(check_props))):
-                        show_warning = True
+            for bone in obj.pose.bones:
+                if bone.bone.layers[30] and (list(set(bone.keys()) & set(check_props))):
+                    show_warning = True
+                    break
+            for b in obj.pose.bones:
+                if b.rigify_type in outdated_types.keys():
+                    if outdated_types[b.rigify_type]:
+                        show_update_metarig = True
+                    else:
+                        show_update_metarig = False
+                        show_not_updatable = True
                         break
-                for b in obj.pose.bones:
-                    if b.rigify_type in outdated_types.keys():
-                        if outdated_types[b.rigify_type]:
-                            show_update_metarig = True
-                        else:
-                            show_update_metarig = False
-                            show_not_updatable = True
-                            break
 
             if show_warning:
                 layout.label(text=WARNING, icon='ERROR')
@@ -99,7 +116,15 @@ class DATA_PT_rigify_buttons(bpy.types.Panel):
                 layout.operator("pose.rigify_upgrade_types", text="Upgrade Metarig")
 
             row = layout.row()
+            # Rig type field
+
+            col = layout.column(align=True)
+            col.active = (not 'rig_id' in C.object.data)
+
+            col.separator()
+            row = col.row()
             row.operator("pose.rigify_generate", text="Generate Rig", icon='POSE_HLT')
+
             row.enabled = enable_generate_and_advanced
 
             if id_store.rigify_advanced_generation:
@@ -162,24 +187,15 @@ class DATA_PT_rigify_buttons(bpy.types.Panel):
 
         elif obj.mode == 'EDIT':
             # Build types list
-            collection_name = str(id_store.rigify_collection).replace(" ", "")
+            build_type_list(context, id_store.rigify_types)
 
-            for i in range(0, len(id_store.rigify_types)):
-                id_store.rigify_types.remove(0)
-
-            for r in rig_lists.rig_list:
-
-                if collection_name == "All":
-                    a = id_store.rigify_types.add()
-                    a.name = r
-                elif r.startswith(collection_name + '.'):
-                    a = id_store.rigify_types.add()
-                    a.name = r
-                elif (collection_name == "None") and ("." not in r):
-                    a = id_store.rigify_types.add()
-                    a.name = r
+            if id_store.rigify_active_type > len(id_store.rigify_types):
+                id_store.rigify_active_type = 0
 
             # Rig type list
+            if len(feature_set_list.feature_set_items(context.scene, context)) > 2:
+                row = layout.row()
+                row.prop(context.object.data, "active_feature_set")
             row = layout.row()
             row.template_list("UI_UL_list", "rigify_types", id_store, "rigify_types", id_store, 'rigify_active_type')
 
@@ -514,7 +530,7 @@ class DATA_UL_rigify_bone_groups(bpy.types.UIList):
         row2.enabled = not bpy.context.object.data.rigify_colors_lock
 
 
-class DATA_MT_rigify_bone_groups_specials(bpy.types.Menu):
+class DATA_MT_rigify_bone_groups_context_menu(bpy.types.Menu):
     bl_label = 'Rigify Bone Groups Specials'
 
     def draw(self, context):
@@ -556,7 +572,7 @@ class DATA_PT_rigify_bone_groups(bpy.types.Panel):
         col = row.column(align=True)
         col.operator("armature.rigify_bone_group_add", icon='ZOOM_IN', text="")
         col.operator("armature.rigify_bone_group_remove", icon='ZOOM_OUT', text="").idx = obj.data.rigify_colors_index
-        col.menu("DATA_MT_rigify_bone_groups_specials", icon='DOWNARROW_HLT', text="")
+        col.menu("DATA_MT_rigify_bone_groups_context_menu", icon='DOWNARROW_HLT', text="")
         row = layout.row()
         row.prop(armature, 'rigify_theme_to_add', text = 'Theme')
         op = row.operator("armature.rigify_bone_group_add_theme", text="Add From Theme")
@@ -582,43 +598,31 @@ class BONE_PT_rigify_buttons(bpy.types.Panel):
         C = context
         id_store = C.window_manager
         bone = context.active_pose_bone
-        collection_name = str(id_store.rigify_collection).replace(" ", "")
         rig_name = str(context.active_pose_bone.rigify_type).replace(" ", "")
 
         layout = self.layout
 
         # Build types list
-        for i in range(0, len(id_store.rigify_types)):
-            id_store.rigify_types.remove(0)
-
-        for r in rig_lists.rig_list:
-            if r in rig_lists.implementation_rigs:
-                continue
-            # collection = r.split('.')[0]  # UNUSED
-            if collection_name == "All":
-                a = id_store.rigify_types.add()
-                a.name = r
-            elif r.startswith(collection_name + '.'):
-                a = id_store.rigify_types.add()
-                a.name = r
-            elif collection_name == "None" and len(r.split('.')) == 1:
-                a = id_store.rigify_types.add()
-                a.name = r
+        build_type_list(context, id_store.rigify_types)
 
         # Rig type field
+        if len(feature_set_list.feature_set_items(context.scene, context)) > 2:
+            row = layout.row()
+            row.prop(context.object.data, "active_feature_set")
         row = layout.row()
-        row.prop_search(bone, "rigify_type", id_store, "rigify_types", text="Rig type:")
+        row.prop_search(bone, "rigify_type", id_store, "rigify_types", text="Rig type")
 
         # Rig type parameters / Rig type non-exist alert
         if rig_name != "":
             try:
-                rig = get_rig_type(rig_name)
-                rig.Rig
+                rig = rig_lists.rigs[rig_name]['module']
             except (ImportError, AttributeError):
                 row = layout.row()
                 box = row.box()
                 box.label(text="ALERT: type \"%s\" does not exist!" % rig_name)
             else:
+                if hasattr(rig.Rig, 'parameters_ui'):
+                    rig = rig.Rig
                 try:
                     rig.parameters_ui
                 except AttributeError:
@@ -636,6 +640,10 @@ class VIEW3D_PT_tools_rigify_dev(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'View'
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode in ['EDIT_ARMATURE', 'EDIT_MESH']
 
     @classmethod
     def poll(cls, context):
@@ -664,7 +672,15 @@ class VIEW3D_PT_rigify_animation_tools(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.object.type == 'ARMATURE' and context.active_object.data.get("rig_id") is not None
+        obj = context.active_object
+        if obj and obj.type == 'ARMATURE':
+            rig_id = obj.data.get("rig_id")
+            if rig_id is not None:
+                has_arm = hasattr(bpy.types, 'POSE_OT_rigify_arm_ik2fk_' + rig_id)
+                has_leg = hasattr(bpy.types, 'POSE_OT_rigify_leg_ik2fk_' + rig_id)
+                return has_arm or has_leg
+
+        return False
 
     def draw(self, context):
         obj = context.active_object
@@ -700,20 +716,19 @@ class VIEW3D_PT_rigify_animation_tools(bpy.types.Panel):
             op.value = False
             op.toggle = False
             op.bake = True
-            row = self.layout.row(align=True)
-            row.prop(id_store, 'rigify_transfer_start_frame')
-            row.prop(id_store, 'rigify_transfer_end_frame')
-            row.operator("rigify.get_frame_range", icon='TIME', text='')
+            RIGIFY_OT_get_frame_range.draw_range_ui(context, self.layout)
 
 
 def rigify_report_exception(operator, exception):
     import traceback
     import sys
     import os
-    # find the module name where the error happened
+    # find the non-utils module name where the error happened
     # hint, this is the metarig type!
     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-    fn = traceback.extract_tb(exceptionTraceback)[-1][0]
+    fns = [ item.filename for item in traceback.extract_tb(exceptionTraceback) ]
+    fns_rig = [ fn for fn in fns if os.path.basename(os.path.dirname(fn)) != 'utils' ]
+    fn = fns_rig[-1]
     fn = os.path.basename(fn)
     fn = os.path.splitext(fn)[0]
     message = []
@@ -725,7 +740,7 @@ def rigify_report_exception(operator, exception):
 
     message.reverse()  # XXX - stupid! menu's are upside down!
 
-    operator.report({'INFO'}, '\n'.join(message))
+    operator.report({'ERROR'}, '\n'.join(message))
 
 
 class LayerInit(bpy.types.Operator):
@@ -733,7 +748,7 @@ class LayerInit(bpy.types.Operator):
 
     bl_idname = "pose.rigify_layer_init"
     bl_label = "Add Rigify Layers"
-    bl_options = {'UNDO'}
+    bl_options = {'UNDO', 'INTERNAL'}
 
     def execute(self, context):
         obj = context.object
@@ -750,21 +765,24 @@ class Generate(bpy.types.Operator):
 
     bl_idname = "pose.rigify_generate"
     bl_label = "Rigify Generate Rig"
-    bl_options = {'UNDO'}
+    bl_options = {'UNDO', 'INTERNAL'}
     bl_description = 'Generates a rig from the active metarig armature'
 
     def execute(self, context):
-        import importlib
-        importlib.reload(generate)
-
-        use_global_undo = context.preferences.edit.use_global_undo
-        context.preferences.edit.use_global_undo = False
         try:
             generate.generate_rig(context, context.object)
         except MetarigError as rig_exception:
+            import traceback
+            traceback.print_exc()
+
             rigify_report_exception(self, rig_exception)
+        except Exception as rig_exception:
+            import traceback
+            traceback.print_exc()
+
+            self.report({'ERROR'}, 'Generation has thrown an exception: ' + str(rig_exception))
         finally:
-            context.preferences.edit.use_global_undo = use_global_undo
+            bpy.ops.object.mode_set(mode='OBJECT')
 
         return {'FINISHED'}
 
@@ -790,7 +808,7 @@ class SwitchToLegacy(bpy.types.Operator):
     bl_idname = "pose.rigify_switch_to_legacy"
     bl_label = "Legacy Mode will disable Rigify new features"
     bl_description = 'Switches Rigify to Legacy Mode'
-    bl_options = {'UNDO'}
+    bl_options = {'UNDO', 'INTERNAL'}
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
@@ -805,7 +823,7 @@ class Sample(bpy.types.Operator):
 
     bl_idname = "armature.metarig_sample_add"
     bl_label = "Add a sample metarig for a rig type"
-    bl_options = {'UNDO'}
+    bl_options = {'UNDO', 'INTERNAL'}
 
     metarig_type: StringProperty(
         name="Type",
@@ -815,17 +833,14 @@ class Sample(bpy.types.Operator):
 
     def execute(self, context):
         if context.mode == 'EDIT_ARMATURE' and self.metarig_type != "":
-            use_global_undo = context.preferences.edit.use_global_undo
-            context.preferences.edit.use_global_undo = False
             try:
-                rig = get_rig_type(self.metarig_type)
+                rig = rig_lists.rigs[self.metarig_type]["module"]
                 create_sample = rig.create_sample
             except (ImportError, AttributeError):
                 raise Exception("rig type '" + self.metarig_type + "' has no sample.")
             else:
                 create_sample(context.active_object)
             finally:
-                context.preferences.edit.use_global_undo = use_global_undo
                 bpy.ops.object.mode_set(mode='EDIT')
 
         return {'FINISHED'}
@@ -913,21 +928,6 @@ class EncodeWidget(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class OBJECT_OT_GetFrameRange(bpy.types.Operator):
-    """Get start and end frame range"""
-    bl_idname = "rigify.get_frame_range"
-    bl_label = "Get Frame Range"
-
-    def execute(self, context):
-        scn = context.scene
-        id_store = context.window_manager
-
-        id_store.rigify_transfer_start_frame = scn.frame_start
-        id_store.rigify_transfer_end_frame = scn.frame_end
-
-        return {'FINISHED'}
-
-
 def FktoIk(rig, window='ALL'):
 
     scn = bpy.context.scene
@@ -939,8 +939,7 @@ def FktoIk(rig, window='ALL'):
     limb_generated_names = get_limb_generated_names(rig)
 
     if window == 'ALL':
-        frames = get_keyed_frames(rig)
-        frames = [f for f in frames if f in range(id_store.rigify_transfer_start_frame, id_store.rigify_transfer_end_frame+1)]
+        frames = get_keyed_frames_in_range(bpy.context, rig)
     elif window == 'CURRENT':
         frames = [scn.frame_current]
     else:
@@ -1017,8 +1016,7 @@ def IktoFk(rig, window='ALL'):
     limb_generated_names = get_limb_generated_names(rig)
 
     if window == 'ALL':
-        frames = get_keyed_frames(rig)
-        frames = [f for f in frames if f in range(id_store.rigify_transfer_start_frame, id_store.rigify_transfer_end_frame+1)]
+        frames = get_keyed_frames_in_range(bpy.context, rig)
     elif window == 'CURRENT':
         frames = [scn.frame_current]
     else:
@@ -1130,8 +1128,7 @@ def rotPoleToggle(rig, window='ALL', value=False, toggle=False, bake=False):
     limb_generated_names = get_limb_generated_names(rig)
 
     if window == 'ALL':
-        frames = get_keyed_frames(rig)
-        frames = [f for f in frames if f in range(id_store.rigify_transfer_start_frame, id_store.rigify_transfer_end_frame+1)]
+        frames = get_keyed_frames_in_range(bpy.context, rig)
     elif window == 'CURRENT':
         frames = [scn.frame_current]
     else:
@@ -1220,6 +1217,7 @@ class OBJECT_OT_IK2FK(bpy.types.Operator):
     bl_idname = "rigify.ik2fk"
     bl_label = "IK2FK"
     bl_description = "Snaps IK limb on FK"
+    bl_options = {'INTERNAL'}
 
     def execute(self,context):
         rig = context.object
@@ -1235,6 +1233,7 @@ class OBJECT_OT_FK2IK(bpy.types.Operator):
     bl_idname = "rigify.fk2ik"
     bl_label = "FK2IK"
     bl_description = "Snaps FK limb on IK"
+    bl_options = {'INTERNAL'}
 
     def execute(self,context):
         rig = context.object
@@ -1249,6 +1248,7 @@ class OBJECT_OT_TransferFKtoIK(bpy.types.Operator):
     bl_idname = "rigify.transfer_fk_to_ik"
     bl_label = "Transfer FK anim to IK"
     bl_description = "Transfer FK animation to IK bones"
+    bl_options = {'INTERNAL'}
 
     def execute(self, context):
         rig = context.object
@@ -1264,6 +1264,7 @@ class OBJECT_OT_TransferIKtoFK(bpy.types.Operator):
     bl_idname = "rigify.transfer_ik_to_fk"
     bl_label = "Transfer IK anim to FK"
     bl_description = "Transfer IK animation to FK bones"
+    bl_options = {'INTERNAL'}
 
     def execute(self, context):
         rig = context.object
@@ -1277,25 +1278,20 @@ class OBJECT_OT_ClearAnimation(bpy.types.Operator):
     bl_idname = "rigify.clear_animation"
     bl_label = "Clear Animation"
     bl_description = "Clear Animation For FK or IK Bones"
+    bl_options = {'INTERNAL'}
 
     anim_type: StringProperty()
 
     def execute(self, context):
+        rig = context.object
+        scn = context.scene
+        if not rig.animation_data:
+            return {'FINISHED'}
+        act = rig.animation_data.action
+        if not act:
+            return {'FINISHED'}
 
-        use_global_undo = context.preferences.edit.use_global_undo
-        context.preferences.edit.use_global_undo = False
-        try:
-            rig = context.object
-            scn = context.scene
-            if not rig.animation_data:
-                return {'FINISHED'}
-            act = rig.animation_data.action
-            if not act:
-                return {'FINISHED'}
-
-            clearAnimation(act, self.anim_type, names=get_limb_generated_names(rig))
-        finally:
-            context.preferences.edit.use_global_undo = use_global_undo
+        clearAnimation(act, self.anim_type, names=get_limb_generated_names(rig))
         return {'FINISHED'}
 
 
@@ -1303,6 +1299,7 @@ class OBJECT_OT_Rot2Pole(bpy.types.Operator):
     bl_idname = "rigify.rotation_pole"
     bl_label = "Rotation - Pole toggle"
     bl_description = "Toggles IK chain between rotation and pole target"
+    bl_options = {'INTERNAL'}
 
     bone_name: StringProperty(default='')
     window: StringProperty(default='ALL')
@@ -1333,7 +1330,7 @@ classes = (
     DATA_OT_rigify_bone_group_remove,
     DATA_OT_rigify_bone_group_remove_all,
     DATA_UL_rigify_bone_groups,
-    DATA_MT_rigify_bone_groups_specials,
+    DATA_MT_rigify_bone_groups_context_menu,
     DATA_PT_rigify_bone_groups,
     DATA_PT_rigify_layer_names,
     DATA_PT_rigify_buttons,
@@ -1348,7 +1345,6 @@ classes = (
     EncodeMetarig,
     EncodeMetarigSample,
     EncodeWidget,
-    OBJECT_OT_GetFrameRange,
     OBJECT_OT_FK2IK,
     OBJECT_OT_IK2FK,
     OBJECT_OT_TransferFKtoIK,
@@ -1360,6 +1356,8 @@ classes = (
 
 def register():
     from bpy.utils import register_class
+
+    animation_register()
 
     # Classes.
     for cls in classes:
@@ -1378,3 +1376,5 @@ def unregister():
     # Classes.
     for cls in classes:
         unregister_class(cls)
+
+    animation_unregister()

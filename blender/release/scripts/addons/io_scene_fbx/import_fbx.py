@@ -70,7 +70,12 @@ def validate_blend_names(name):
     if len(name) > 63:
         import hashlib
         h = hashlib.sha1(name).hexdigest()
-        return name[:55].decode('utf-8', 'replace') + "_" + h[:7]
+        n = 55
+        name_utf8 = name[:n].decode('utf-8', 'replace') + "_" + h[:7]
+        while len(name_utf8.encode()) > 63:
+            n -= 1
+            name_utf8 = name[:n].decode('utf-8', 'replace') + "_" + h[:7]
+        return name_utf8
     else:
         # We use 'replace' even though FBX 'specs' say it should always be utf8, see T53841.
         return name.decode('utf-8', 'replace')
@@ -644,7 +649,9 @@ def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
             bl_obj = item.bl_obj
 
         transform_data = item.fbx_transform_data
-        rot_prev = bl_obj.rotation_euler.copy()
+        rot_eul_prev = bl_obj.rotation_euler.copy()
+        rot_quat_prev = bl_obj.rotation_quaternion.copy()
+
 
         # Pre-compute inverted local rest matrix of the bone, if relevant.
         restmat_inv = item.get_bind_matrix().inverted_safe() if item.is_bone else None
@@ -678,13 +685,15 @@ def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
             # Now we have a virtual matrix of transform from AnimCurves, we can insert keyframes!
             loc, rot, sca = mat.decompose()
             if rot_mode == 'QUATERNION':
-                pass  # nothing to do!
+                if rot_quat_prev.dot(rot) < 0.0:
+                    rot = -rot
+                rot_quat_prev = rot
             elif rot_mode == 'AXIS_ANGLE':
                 vec, ang = rot.to_axis_angle()
                 rot = ang, vec.x, vec.y, vec.z
             else:  # Euler
-                rot = rot.to_euler(rot_mode, rot_prev)
-                rot_prev = rot
+                rot = rot.to_euler(rot_mode, rot_eul_prev)
+                rot_eul_prev = rot
             for fc, value in zip(blen_curves, chain(loc, rot, sca)):
                 fc.keyframe_points.insert(frame, value, options={'NEEDED', 'FAST'}).interpolation = 'LINEAR'
 
@@ -717,12 +726,12 @@ def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, anim_o
                     id_data = item.bl_obj
                     # XXX Ignore rigged mesh animations - those are a nightmare to handle, see note about it in
                     #     FbxImportHelperNode class definition.
-                    if id_data.type == 'MESH' and id_data.parent and id_data.parent.type == 'ARMATURE':
+                    if id_data and id_data.type == 'MESH' and id_data.parent and id_data.parent.type == 'ARMATURE':
                         continue
                 if id_data is None:
                     continue
 
-                # Create new action if needed (should always be needed!
+                # Create new action if needed (should always be needed, except for keyblocks from shapekeys cases).
                 key = (as_uuid, al_uuid, id_data)
                 action = actions.get(key)
                 if action is None:
@@ -1006,7 +1015,8 @@ def blen_read_geom_layer_uv(fbx_obj, mesh):
             fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, b'UV'))
             fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'UVIndex'))
 
-            uv_lay = mesh.uv_layers.new(name=fbx_layer_name)
+            # Always init our new layers with (0, 0) UVs.
+            uv_lay = mesh.uv_layers.new(name=fbx_layer_name, do_init=False)
             if uv_lay is None:
                 print("Failed to add {%r %r} UVLayer to %r (probably too many of them?)"
                       "" % (layer_id, fbx_layer_name, mesh.name))
@@ -1040,7 +1050,8 @@ def blen_read_geom_layer_color(fbx_obj, mesh):
             fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, b'Colors'))
             fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'ColorIndex'))
 
-            color_lay = mesh.vertex_colors.new(name=fbx_layer_name)
+            # Always init our new layers with full white opaque color.
+            color_lay = mesh.vertex_colors.new(name=fbx_layer_name, do_init=False)
             blen_data = color_lay.data
 
             # some valid files omit this data
@@ -1105,6 +1116,50 @@ def blen_read_geom_layer_smooth(fbx_obj, mesh):
         print("warning layer %r mapping type unsupported: %r" % (fbx_layer.id, fbx_layer_mapping))
         return False
 
+def blen_read_geom_layer_edge_crease(fbx_obj, mesh):
+    from math import sqrt
+
+    fbx_layer = elem_find_first(fbx_obj, b'LayerElementEdgeCrease')
+
+    if fbx_layer is None:
+        return False
+
+    # all should be valid
+    (fbx_layer_name,
+     fbx_layer_mapping,
+     fbx_layer_ref,
+     ) = blen_read_geom_layerinfo(fbx_layer)
+
+    if fbx_layer_mapping != b'ByEdge':
+        return False
+
+    layer_id = b'EdgeCrease'
+    fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, layer_id))
+
+    # some models have bad edge data, we cant use this info...
+    if not mesh.edges:
+        print("warning skipping edge crease data, no valid edges...")
+        return False
+
+    if fbx_layer_mapping == b'ByEdge':
+        # some models have bad edge data, we cant use this info...
+        if not mesh.edges:
+            print("warning skipping edge crease data, no valid edges...")
+            return False
+
+        blen_data = mesh.edges
+        return blen_read_geom_array_mapped_edge(
+            mesh, blen_data, "crease",
+            fbx_layer_data, None,
+            fbx_layer_mapping, fbx_layer_ref,
+            1, 1, layer_id,
+            # Blender squares those values before sending them to OpenSubdiv, when other softwares don't,
+            # so we need to compensate that to get similar results through FBX...
+            xform=sqrt,
+            )
+    else:
+        print("warning layer %r mapping type unsupported: %r" % (fbx_layer.id, fbx_layer_mapping))
+        return False
 
 def blen_read_geom_layer_normal(fbx_obj, mesh, xform=None):
     fbx_layer = elem_find_first(fbx_obj, b'LayerElementNormal')
@@ -1236,6 +1291,8 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
     # must be after edge, face loading.
     ok_smooth = blen_read_geom_layer_smooth(fbx_obj, mesh)
 
+    ok_crease = blen_read_geom_layer_edge_crease(fbx_obj, mesh)
+
     ok_normals = False
     if settings.use_custom_normals:
         # Note: we store 'temp' normals in loops, since validate() may alter final mesh,
@@ -1268,6 +1325,9 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
 
     if not ok_smooth:
         mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+
+    if ok_crease:
+        mesh.use_customdata_edge_crease = True
 
     if settings.use_custom_props:
         blen_read_custom_properties(fbx_obj, mesh, settings)
@@ -1330,9 +1390,11 @@ def blen_read_material(fbx_tmpl, fbx_obj, settings):
     ma = bpy.data.materials.new(name=elem_name_utf8)
 
     const_color_white = 1.0, 1.0, 1.0
+    const_color_black = 0.0, 0.0, 0.0
 
     fbx_props = (elem_find_first(fbx_obj, b'Properties70'),
                  elem_find_first(fbx_tmpl, b'Properties70', fbx_elem_nil))
+    fbx_props_no_template = (fbx_props[0], fbx_elem_nil)
 
     ma_wrap = node_shader_utils.PrincipledBSDFWrapper(ma, is_readonly=False, use_nodes=True)
     ma_wrap.base_color = elem_props_get_color_rgb(fbx_props, b'DiffuseColor', const_color_white)
@@ -1343,12 +1405,31 @@ def blen_read_material(fbx_tmpl, fbx_obj, settings):
     #     (from 1.0 - 0.0 Principled BSDF range to 0.0 - 100.0 FBX shininess range)...
     fbx_shininess = elem_props_get_number(fbx_props, b'Shininess', 20.0)
     ma_wrap.roughness = 1.0 - (sqrt(fbx_shininess) / 10.0)
-    ma_wrap.transmission = 1.0 - elem_props_get_number(fbx_props, b'Opacity', 1.0)
+    # Sweetness... Looks like we are not the only ones to not know exactly how FBX is supposed to work (see T59850).
+    # According to one of its developers, Unity uses that formula to extract alpha value:
+    #
+    #   alpha = 1 - TransparencyFactor
+    #   if (alpha == 1 or alpha == 0):
+    #       alpha = 1 - TransparentColor.r
+    #
+    # Until further info, let's assume this is correct way to do, hence the following code for TransparentColor.
+    # However, there are some cases (from 3DSMax, see T65065), where we do have TransparencyFactor only defined
+    # in the template to 0.0, and then materials defining TransparentColor to pure white (1.0, 1.0, 1.0),
+    # and setting alpha value in Opacity... try to cope with that too. :((((
+    alpha = 1.0 - elem_props_get_number(fbx_props, b'TransparencyFactor', 0.0)
+    if (alpha == 1.0 or alpha == 0.0):
+        alpha = elem_props_get_number(fbx_props_no_template, b'Opacity', None)
+        if alpha is None:
+            alpha = 1.0 - elem_props_get_color_rgb(fbx_props, b'TransparentColor', const_color_black)[0]
+    ma_wrap.alpha = alpha
     ma_wrap.metallic = elem_props_get_number(fbx_props, b'ReflectionFactor', 0.0)
     # We have no metallic (a.k.a. reflection) color...
     # elem_props_get_color_rgb(fbx_props, b'ReflectionColor', const_color_white)
-    # (x / 7.142) is only a guess, cycles usable range is (0.0 -> 0.5)
-    ma_wrap.normalmap_strength = elem_props_get_number(fbx_props, b'BumpFactor', 2.5) / 7.142
+    ma_wrap.normalmap_strength = elem_props_get_number(fbx_props, b'BumpFactor', 1.0)
+    # For emission color we can take into account the factor, but only for default values, not in case of texture.
+    emission_factor = elem_props_get_number(fbx_props, b'EmissiveFactor', 1.0)
+    ma_wrap.emission_color = [c * emission_factor
+                              for c in elem_props_get_color_rgb(fbx_props, b'EmissiveColor', const_color_black)]
 
     nodal_material_wrap_map[ma] = ma_wrap
 
@@ -1383,6 +1464,8 @@ def blen_read_texture_image(fbx_tmpl, fbx_obj, basedir, settings):
     # Aaaaaaaarrrrrrrrgggggggggggg!!!!!!!!!!!!!!
     filepath = elem_find_first_string(fbx_obj, b'RelativeFilename')
     if filepath:
+        # Make sure we do handle a relative path, and not an absolute one (see D5143).
+        filepath = filepath.lstrip(os.path.sep).lstrip(os.path.altsep)
         filepath = os.path.join(basedir, filepath)
     else:
         filepath = elem_find_first_string(fbx_obj, b'FileName')
@@ -1823,7 +1906,11 @@ class FbxImportHelperNode:
 
             meshes = set()
             for child in self.children:
-                child.collect_skeleton_meshes(meshes)
+                # Children meshes may be linked to children armatures, in which case we do not want to link them
+                # to a parent one. See T70244.
+                child.collect_armature_meshes()
+                if not child.meshes:
+                    child.collect_skeleton_meshes(meshes)
             for m in meshes:
                 old_matrix = m.matrix
                 m.matrix = armature_matrix_inv @ m.get_world_matrix()
@@ -2243,6 +2330,7 @@ def load(operator, context, filepath="",
          decal_offset=0.0,
          use_anim=True,
          anim_offset=1.0,
+         use_subsurf=False,
          use_custom_props=True,
          use_custom_props_enum_as_string=True,
          ignore_leaf_bones=False,
@@ -2371,6 +2459,7 @@ def load(operator, context, filepath="",
         use_custom_normals, use_image_search,
         use_alpha_decals, decal_offset,
         use_anim, anim_offset,
+        use_subsurf,
         use_custom_props, use_custom_props_enum_as_string,
         nodal_material_wrap_map, image_cache,
         ignore_leaf_bones, force_connect_children, automatic_bone_orientation, bone_correction_matrix,
@@ -2772,6 +2861,35 @@ def load(operator, context, filepath="",
                 blend_shape_channels[bc_uuid] = keyblocks
     _(); del _
 
+    if settings.use_subsurf:
+        perfmon.step("FBX import: Subdivision surfaces")
+
+        # Look through connections for subsurf in meshes and add it to the parent object
+        def _():
+            for fbx_link in fbx_connections.elems:
+                if fbx_link.props[0] != b'OO':
+                    continue
+                if fbx_link.props_type[1:3] == b'LL':
+                    c_src, c_dst = fbx_link.props[1:3]
+                    parent = fbx_helper_nodes.get(c_dst)
+                    if parent is None:
+                        continue
+
+                    child = fbx_helper_nodes.get(c_src)
+                    if child is None:
+                        fbx_sdata, bl_data = fbx_table_nodes.get(c_src, (None, None))
+                        if fbx_sdata.id != b'Geometry':
+                            continue
+
+                        preview_levels = elem_prop_first(elem_find_first(fbx_sdata, b'PreviewDivisionLevels'))
+                        render_levels = elem_prop_first(elem_find_first(fbx_sdata, b'RenderDivisionLevels'))
+                        if isinstance(preview_levels, int) and isinstance(render_levels, int):
+                            mod = parent.bl_obj.modifiers.new('subsurf', 'SUBSURF')
+                            mod.levels = preview_levels
+                            mod.render_levels = render_levels
+
+        _(); del _
+
     if use_anim:
         perfmon.step("FBX import: Animations...")
 
@@ -2938,27 +3056,20 @@ def load(operator, context, filepath="",
             rot = tuple(-r for r in elem_props_get_vector_3d(fbx_props, b'Rotation', (0.0, 0.0, 0.0)))
             scale = tuple(((1.0 / s) if s != 0.0 else 1.0)
                           for s in elem_props_get_vector_3d(fbx_props, b'Scaling', (1.0, 1.0, 1.0)))
-            clamp_uv = (bool(elem_props_get_enum(fbx_props, b'WrapModeU', 0)),
-                        bool(elem_props_get_enum(fbx_props, b'WrapModeV', 0)))
+            clamp = (bool(elem_props_get_enum(fbx_props, b'WrapModeU', 0)) or
+                     bool(elem_props_get_enum(fbx_props, b'WrapModeV', 0)))
 
             if (loc == (0.0, 0.0, 0.0) and
                 rot == (0.0, 0.0, 0.0) and
                 scale == (1.0, 1.0, 1.0) and
-                clamp_uv == (False, False)):
+                clamp == False):
                 return
 
             node_texture.translation = loc
             node_texture.rotation = rot
             node_texture.scale = scale
-
-            # awkward conversion UV clamping to min/max
-            node_texture.min = (0.0, 0.0, 0.0)
-            node_texture.max = (1.0, 1.0, 1.0)
-            node_texture.use_min = node_texture.use_max = clamp_uv[0] or clamp_uv[1]
-            if clamp_uv[0] != clamp_uv[1]:
-                # use bool as index
-                node_texture.min[not clamp[0]] = -1e9
-                node_texture.max[not clamp[0]] = 1e9
+            if clamp:
+                node_texture.extension = 'EXTEND'
 
         for fbx_uuid, fbx_item in fbx_table_nodes.items():
             fbx_obj, blen_data = fbx_item
@@ -2987,9 +3098,8 @@ def load(operator, context, filepath="",
                         ma_wrap.metallic_texture.image = image
                         texture_mapping_set(fbx_lnk, ma_wrap.metallic_texture)
                     elif lnk_type in {b'TransparentColor', b'TransparentFactor'}:
-                        # Transparency... sort of...
-                        ma_wrap.transmission_texture.image = image
-                        texture_mapping_set(fbx_lnk, ma_wrap.transmission_texture)
+                        ma_wrap.alpha_texture.image = image
+                        texture_mapping_set(fbx_lnk, ma_wrap.alpha_texture)
                         if use_alpha_decals:
                             material_decals.add(material)
                     elif lnk_type == b'ShininessExponent':
@@ -3004,6 +3114,9 @@ def load(operator, context, filepath="",
                     elif lnk_type == b'Bump':
                         # TODO displacement...
                         """
+                    elif lnk_type in {b'EmissiveColor'}:
+                        ma_wrap.emission_color_texture.image = image
+                        texture_mapping_set(fbx_lnk, ma_wrap.emission_color_texture)
                     else:
                         print("WARNING: material link %r ignored" % lnk_type)
 
@@ -3025,8 +3138,8 @@ def load(operator, context, filepath="",
                     material_decals.add(material)
 
                 ma_wrap = nodal_material_wrap_map[material]
-                ma_wrap.transmission_texture.use_alpha = True
-                ma_wrap.transmission_texture.copy_from(ma_wrap.base_color_texture)
+                ma_wrap.alpha_texture.use_alpha = True
+                ma_wrap.alpha_texture.copy_from(ma_wrap.base_color_texture)
 
             # Propagate mapping from diffuse to all other channels which have none defined.
             # XXX Commenting for now, I do not really understand the logic here, why should diffuse mapping

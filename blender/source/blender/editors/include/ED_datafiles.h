@@ -17,7 +17,8 @@
  * All rights reserved.
  */
 
-/** \file \ingroup editors
+/** \file
+ * \ingroup editors
  */
 
 #ifndef __ED_DATAFILES_H__
@@ -28,8 +29,8 @@
 extern int datatoc_startup_blend_size;
 extern char datatoc_startup_blend[];
 
-extern int datatoc_preview_cycles_blend_size;
-extern char datatoc_preview_cycles_blend[];
+extern int datatoc_preview_blend_size;
+extern char datatoc_preview_blend[];
 
 extern int datatoc_preview_grease_pencil_blend_size;
 extern char datatoc_preview_grease_pencil_blend[];
@@ -283,6 +284,12 @@ extern char datatoc_gp_brush_marker_png[];
 
 extern int datatoc_gp_brush_fill_png_size;
 extern char datatoc_gp_brush_fill_png[];
+
+extern int datatoc_gp_brush_airbrush_png_size;
+extern char datatoc_gp_brush_airbrush_png[];
+
+extern int datatoc_gp_brush_chisel_png_size;
+extern char datatoc_gp_brush_chisel_png[];
 
 extern int datatoc_gp_brush_erase_soft_png_size;
 extern char datatoc_gp_brush_erase_soft_png[];

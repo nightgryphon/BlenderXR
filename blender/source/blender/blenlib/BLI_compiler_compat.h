@@ -17,7 +17,8 @@
 #ifndef __BLI_COMPILER_COMPAT_H__
 #define __BLI_COMPILER_COMPAT_H__
 
-/** \file \ingroup bli
+/** \file
+ * \ingroup bli
  *
  * Use to help with cross platform portability.
  */
@@ -28,8 +29,11 @@
 
 #if (defined(__GNUC__) || defined(__clang__)) && defined(__cplusplus)
 extern "C++" {
-	/* Some magic to be sure we don't have reference in the type. */
-	template<typename T> static inline T decltype_helper(T x) { return x; }
+/* Some magic to be sure we don't have reference in the type. */
+template<typename T> static inline T decltype_helper(T x)
+{
+  return x;
+}
 #  define typeof(x) decltype(decltype_helper(x))
 }
 #endif
@@ -41,4 +45,10 @@ extern "C++" {
 #  define BLI_INLINE static inline __attribute__((always_inline)) __attribute__((__unused__))
 #endif
 
-#endif  /* __BLI_COMPILER_COMPAT_H__ */
+#if defined(__GNUC__)
+#  define BLI_NOINLINE __attribute__((noinline))
+#else
+#  define BLI_NOINLINE
+#endif
+
+#endif /* __BLI_COMPILER_COMPAT_H__ */

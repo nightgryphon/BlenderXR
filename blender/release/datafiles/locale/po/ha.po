@@ -1,8 +1,9 @@
+
 msgid ""
 msgstr ""
-"Project-Id-Version: Blender 2.80 (sub 39) (b'6d89337257b6')\n"
+"Project-Id-Version: Blender 2.81 (sub 16) (b'99640d062234')\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2018-12-24 15:04:25\n"
+"POT-Creation-Date: 2019-11-20 13:23:12\n"
 "PO-Revision-Date: 2017-12-25 14:01+0100\n"
 "Last-Translator: UMAR HARUNA ABDULLAHI <umarbrowser20@gmail.com>\n"
 "Language-Team: BlenderNigeria <pyc0der@outlook.com>\n"
@@ -103,10 +104,6 @@ msgstr "An zabi aikin kungiya"
 
 msgid "Expanded"
 msgstr "budadde"
-
-
-msgid "Action group is expanded"
-msgstr "aikin kungiya ya bude"
 
 
 msgid "Action Groups"

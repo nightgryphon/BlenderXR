@@ -17,9 +17,9 @@
  * All rights reserved.
  */
 
-/** \file \ingroup modifiers
+/** \file
+ * \ingroup modifiers
  */
-
 
 #ifndef __MOD_FLUIDSIM_UTIL_H__
 #define __MOD_FLUIDSIM_UTIL_H__
@@ -27,16 +27,13 @@
 struct FluidsimModifierData;
 struct Mesh;
 struct ModifierEvalContext;
-struct Object;
-struct Scene;
 
 /* new fluid-modifier interface */
 void fluidsim_init(struct FluidsimModifierData *fluidmd);
 void fluidsim_free(struct FluidsimModifierData *fluidmd);
 
-struct Mesh *fluidsimModifier_do(
-        struct FluidsimModifierData *fluidmd,
-        const struct ModifierEvalContext *ctx,
-        struct Mesh *me);
+struct Mesh *fluidsimModifier_do(struct FluidsimModifierData *fluidmd,
+                                 const struct ModifierEvalContext *ctx,
+                                 struct Mesh *me);
 
 #endif
